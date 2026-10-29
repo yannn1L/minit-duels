@@ -9,7 +9,7 @@ export const MINIT_MOTH = {
   id: 'moth',
   name: 'MOTH',
   color: 0x88ffcc,
-  desc: 'Incubates safely in a cocoon and hatches into a mythical spore-blaster.',
+  desc: 'Incubates and Hatched?',
   stats: { hp: 1400, speed: 0.0 },
   targeting: { type: 'closest_enemy' },
 

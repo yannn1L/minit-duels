@@ -35,7 +35,8 @@ export const CFG = {
     BOUNCE_Y: { tX: 1.25, tY: 1.05 },
     HIT: { tX: 1.3, tY: 1.0 },
     ACTION: { tX: 1.3, tY: 1.3 },
-    HIT_FLASH_DUR: 5,
+    HIT_FLASH_COLOR: 0xff1133, // Red damage flash according to texture shape (tweakable)
+    HIT_FLASH_DUR: 6, // Duration of damage flash in frames (tweakable)
     DEATH_FLASH_INTENSITY: 0.6,
     DEATH_SHAKE: 8,
     HIT_STOP_DUR: 2,

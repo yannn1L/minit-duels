@@ -157,6 +157,33 @@ export class Arena extends PIXI.Container {
     this.fA = Math.max(this.fA, a);
   }
 
+  // Modular & Flexible Knockback System for any Minit
+  applyKnockback(targetId, { fromX, fromY, forceX, forceY, force = 0.65, shake = 6, playSound = false }) {
+    const p = this.players.find((pl) => pl.id === targetId);
+    if (!p || p.hp <= 0) return;
+
+    let kx = forceX || 0;
+    let ky = forceY || 0;
+
+    // Calculate radial knockback away from source coordinates if provided
+    if (fromX !== undefined && fromY !== undefined) {
+      const angle = Math.atan2(p.y - fromY, p.x - fromX);
+      kx = Math.cos(angle) * force;
+      ky = Math.sin(angle) * force;
+    }
+
+    // Apply high-velocity knockback impulse to the player
+    p.dx = kx;
+    p.dy = ky;
+
+    // Visual juice feedback
+    const bS = p.baseScale || 1.0;
+    p.aS.tX = bS * 0.7;
+    p.aS.tY = bS * 1.35;
+    if (shake) this.shake = Math.max(this.shake, shake);
+    if (playSound) AudioSys.play('hit', 0.8);
+  }
+
   damagePlayer(pid, payload, fxC) {
     const p = this.players.find((pl) => pl.id === pid);
     if (!p || p.hp <= 0) return;
@@ -168,6 +195,19 @@ export class Arena extends PIXI.Container {
 
     if (vfx.showText !== false) this.fxPool.spawnDmgText(pX, pY, payload.dmg, fxC);
     if (vfx.playSound !== false) AudioSys.play(vfx.sound || 'hit', 0.6);
+
+    // Modular knockback handling from attack payload
+    if (payload.knockback) {
+      const kb = payload.knockback;
+      this.applyKnockback(pid, {
+        fromX: kb.fromX,
+        fromY: kb.fromY,
+        forceX: kb.forceX,
+        forceY: kb.forceY,
+        force: kb.force ?? 0.7,
+        shake: kb.shake ?? vfx.shake ?? 6
+      });
+    }
 
     const bS = p.baseScale || 1.0;
     p.aS.tX = bS * CFG.JUICE.HIT.tX;
@@ -344,10 +384,10 @@ export class Arena extends PIXI.Container {
       p.aS.y += (p.aS.tY - p.aS.y) * CFG.RENDER.SPRING_DAMP * tS;
       p.spr.scale.set(p.aS.x, p.aS.y);
 
-      // Clean hit flash without shaders
+      // Damage flash matching texture silhouette (tweakable in config.js)
       if (p.fT > 0) {
         p.fT -= tS;
-        p.spr.tint = 0xffffff;
+        p.spr.tint = CFG.JUICE.HIT_FLASH_COLOR;
       } else {
         p.spr.tint = 0xffffff;
       }

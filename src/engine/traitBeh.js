@@ -422,4 +422,21 @@ export function registerTraitsAndTargeting() {
     owner.aS.tY = (owner.baseScale || 1.0) * 1.8;
     e.dead = true;
   });
+
+  // Universal: Modular knockback on hit for any minit
+  MinitEngine.Registry.addTrait('knockbackOnHit', (e, a) => {
+    const radius = e.p.vfx?.radius || e.p.payload?.zoneRadius || 1.5;
+    const force = e.p.payload?.knockbackForce || 0.75;
+    a.players.forEach((p) => {
+      if (e.p.ownerId !== p.id && p.hp > 0 && FastMath.dist(e.x, e.y, p.x, p.y) <= radius) {
+        a.applyKnockback(p.id, {
+          fromX: e.x,
+          fromY: e.y,
+          force: force,
+          shake: e.p.payload?.hitVfx?.shake || 6,
+          playSound: true
+        });
+      }
+    });
+  });
 }

@@ -8,7 +8,7 @@ export const MINIT_ABSORB = {
   id: 'absorb',
   name: 'ABSORB',
   color: 0xff4422,
-  desc: 'Spawns a vortex zone. Drains HP and speed from enemies to grow in size and power.',
+  desc: 'Grow in size and power.',
   stats: { hp: 1300, speed: 0.1 },
   targeting: { type: 'closest_enemy' },
 

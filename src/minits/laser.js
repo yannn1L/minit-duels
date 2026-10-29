@@ -9,7 +9,7 @@ export const MINIT_LASER = {
   id: 'laser',
   name: 'LAZER',
   color: 0x00e5ff,
-  desc: 'Locks onto a target with an intense beam from its core.',
+  desc: 'Intense beam from its core.',
   stats: { hp: 750, speed: 0.15 },
   targeting: { type: 'closest_enemy' },
 

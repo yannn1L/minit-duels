@@ -1,5 +1,5 @@
 // ============================================================
-// MINIT: MURASAKI / GOJO (ES Module - Hollow Purple)
+// MINIT: MURASAKI / GOJO (ES Module - Hollow Purple with Cursed Aura)
 // ============================================================
 import { CFG } from '../config.js';
 import { FastMath } from '../engine/FastMath.js';
@@ -9,7 +9,7 @@ export const MINIT_MURASAKI = {
   id: 'murasaki',
   name: 'Gojo',
   color: 0x9900ff,
-  desc: 'Murasaki. Creates Red and Blue singularities, merging them into an unstoppable Hollow Purple beam.',
+  desc: 'Murasaki.',
   stats: { hp: 1400, speed: 0.1 },
   targeting: { type: 'closest_enemy' },
 
@@ -33,10 +33,13 @@ export const MINIT_MURASAKI = {
   },
 
   customTextures: {
+    // Red & Blue singularities
     fx_murasaki_blue: (g) =>
       g.beginFill(0x0044ff).drawCircle(0, 0, 10).beginFill(0xffffff).drawCircle(0, 0, 3).endFill(),
     fx_murasaki_red: (g) =>
       g.beginFill(0xff0044).drawCircle(0, 0, 10).beginFill(0xffffff).drawCircle(0, 0, 3).endFill(),
+
+    // Hollow Purple Beam
     fx_murasaki_beam: (g) => {
       g.beginFill(0xcc66ff, 0.35)
         .drawCircle(0, 0, 14)
@@ -48,7 +51,18 @@ export const MINIT_MURASAKI = {
     },
     fx_murasaki_spark: (g) => g.beginFill(0xdd88ff).drawRect(-1.5, -1.5, 3, 3).endFill(),
     fx_murasaki_lightning: (g) =>
-      g.lineStyle(2, 0xffffff, 1).moveTo(0, -4).lineTo(2, 0).lineTo(-2, 2).lineTo(0, 6).endFill()
+      g.lineStyle(2, 0xffffff, 1).moveTo(0, -4).lineTo(2, 0).lineTo(-2, 2).lineTo(0, 6).endFill(),
+
+    // Cursed Energy Aura surrounding Gojo during charge
+    fx_gojo_aura_ring: (g) => {
+      g.lineStyle(2, 0xaa33ff, 0.8).drawCircle(0, 0, 16);
+      g.lineStyle(1, 0x00ffff, 0.6).drawCircle(0, 0, 13);
+      g.beginFill(0x7700cc, 0.2).drawCircle(0, 0, 16).endFill();
+    },
+    fx_gojo_aura_wisp: (g) => {
+      g.beginFill(0xbb55ff, 0.85).drawRect(-1.5, -2, 3, 4);
+      g.beginFill(0xffffff, 0.9).drawRect(-1, -1, 2, 2).endFill();
+    }
   },
 
   customAudio: {
@@ -92,6 +106,37 @@ export const MINIT_MURASAKI = {
       }
       const angle = e.p.lastAngle;
       const elapsed = e.maxL - e.l;
+
+      // ==================================================
+      // CURSED ENERGY AURA SURROUNDING GOJO (0 - 100 frames)
+      // Visual aura ring and rising energy wisps around Gojo
+      // ==================================================
+      if (elapsed < 100) {
+        // Pulsating aura field directly centered on Gojo
+        a.fxPool.spawnPhysics('fx_gojo_aura_ring', pX, pY, 0, 0, 2, 1, 1, false, 0xffffff);
+
+        // Rising cursed energy wisps
+        if (e.l % 2 === 0) {
+          const wispAngle = FastMath.rand() * 6.28;
+          const wispDist = FastMath.randRange(4, 14);
+          a.fxPool.spawnPhysics(
+            'fx_gojo_aura_wisp',
+            pX + Math.cos(wispAngle) * wispDist,
+            pY + Math.sin(wispAngle) * wispDist,
+            FastMath.randRange(-0.5, 0.5),
+            -FastMath.randRange(1.2, 2.5),
+            12,
+            0.9,
+            0.9,
+            true,
+            0xbb55ff
+          );
+        }
+
+        // Slight breathing scale vibration on Gojo's sprite
+        owner.aS.tX = 1.05 + Math.sin(elapsed * 0.35) * 0.12;
+        owner.aS.tY = 1.05 + Math.sin(elapsed * 0.35) * 0.12;
+      }
 
       // --------------------------------------------------
       // PHASE 1: FORMING ORBS (0 - 80 frames)
@@ -168,8 +213,7 @@ export const MINIT_MURASAKI = {
         owner.x -= Math.cos(angle) * 0.03;
         owner.y -= Math.sin(angle) * 0.03;
 
-        // Optimized beam: 20 beam points spaced 24px apart instead of 40 points
-        // Eliminates the 3,200 particle flood while looking equally luminous!
+        // Optimized beam: 20 beam points spaced 24px apart
         const beamSteps = 20;
         const stepDist = 24;
         for (let i = 1; i <= beamSteps; i++) {
