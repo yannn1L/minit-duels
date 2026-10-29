@@ -1,69 +1,50 @@
 // ============================================================
-// CONFIGURATION & CONSTANTS (ES Module)
+// CONFIGURATION & CONSTANTS (ES Module - Crisp HD Pixel Tuning)
 // ============================================================
 import * as PIXI from 'pixi.js';
 
 export const CFG = {
-  APP: { W: 800, H: 600, BG_COLOR: 0x050508 },
-  BG: {
-    FPS: 30,
-    GRID_SPEED_X: -0.1,
-    GRID_SPEED_Y: 0.1,
-    FLOATER_COUNT: 12,
-    FLOATER_SPEED_Y: 0.1,
-    FLOATER_SPEED_X: 0.1
-  },
+  APP: { W: 800, H: 600, BG_COLOR: 0x07070c },
   GRID: { TS: 16, HALF_TS: 8, COLS: 10, ROWS: 10 },
-  RENDER: { LERP: 0.2, SPRING_TENSION: 0.2, SPRING_DAMP: 0.35 },
+  RENDER: { LERP: 0.22, SPRING_TENSION: 0.2, SPRING_DAMP: 0.35 },
   SIM: { MAX_DT: 2.0, MAX_ITERATIONS: 3, SLOWMO_SPEED: 0.25, SLOWMO_DUR: 40 },
-  SHADER: {
-    aberration: 0.0008,
-    scanline: 0.001,
-    vignette: 0.12,
-    brightness: 1.15
-  },
   PHYSICS: { DRAG_X: 0.9, DRAG_Y: 0.95, BOUNCE: -1, WANDER: 0.05 },
   ARENA: {
     BASE_HP: 1000,
     PADDING: 0.2,
-    BG_COLOR: 0x141422,
-    BG_ALPHA: 0.85,
-    GRID_COLOR: 0x222238,
-    GRID_ALPHA: 0.9,
-    GUARD_COLOR: 0x33334d
+    BG_COLOR: 0x12121e,
+    BG_ALPHA: 0.95,
+    GRID_COLOR: 0x1c1c2e,
+    GRID_ALPHA: 0.8,
+    GUARD_COLOR: 0x2a2a40
   },
   JUICE: {
-    BOUNCE_X: { tX: 1.0, tY: 1.3 },
-    BOUNCE_Y: { tX: 1.3, tY: 1.1 },
-    HIT: { tX: 1.4, tY: 1.0 },
-    ACTION: { tX: 1.4, tY: 1.4 },
-    HIT_FLASH_DUR: 6,
-    DEATH_FLASH_INTENSITY: 0.8,
-    DEATH_SHAKE: 10,
+    BOUNCE_X: { tX: 1.0, tY: 1.25 },
+    BOUNCE_Y: { tX: 1.25, tY: 1.05 },
+    HIT: { tX: 1.3, tY: 1.0 },
+    ACTION: { tX: 1.3, tY: 1.3 },
+    HIT_FLASH_DUR: 5,
+    DEATH_FLASH_INTENSITY: 0.6,
+    DEATH_SHAKE: 8,
     HIT_STOP_DUR: 2,
-    DEATH_HIT_STOP: 15
-  },
-  OUTLINE: {
-    UNIT: { thickness: 0, color: 0x231526 },
-    TEXT: { thickness: 1.5, color: 0x05050a },
-    UI: { thickness: 1.0, color: 0x141420 }
+    DEATH_HIT_STOP: 12
   },
   UI: {
     SCROLL: { Y: 110, H: 330 },
     BTN: { PAD_X: 25, PAD_Y: 15 },
     CARD_LAYOUT: {
-      BASE_W: 280,
-      BASE_H: 130,
-      SCALE: 0.8,
-      GAP_X: 25,
-      GAP_Y: 15,
-      COLS: 3,
-      START_Y: 125,
-      ICON: { X: 30, Y: 30, SCALE: 2.5 },
-      NAME: { X: 60, Y: 10 },
+      BASE_W: 232,
+      BASE_H: 126,
+      SCALE: 0.78,
+      GAP_X: 14,
+      GAP_Y: 14,
+      COLS: 4,
+      START_Y: 120,
+      ICON: { X: 28, Y: 28, SCALE: 2.2 },
+      NAME: { X: 56, Y: 10 },
       STATUS: { OFFSET_X: 8, OFFSET_Y: -1.1, SIZE: 12, GAP: 2 },
-      HP_BAR: { X: 60, Y: 30, W: 151, H: 11, SEGMENTS: 10, SEG_W: 12, PAD: 2, GAP: 3 },
-      DESC: { X: 12, Y: 58 }
+      HP_BAR: { X: 56, Y: 28, W: 136, H: 10, SEGMENTS: 10, SEG_W: 10, PAD: 2, GAP: 3 },
+      DESC: { X: 10, Y: 52 }
     }
   },
   LAYOUT: {
@@ -95,7 +76,7 @@ export const CFG = {
   },
   VFX: {
     TEXT_LIMIT: 40,
-    PHYSICS_LIMIT: 500, // Optimized down from 1000 to eliminate memory churn & loop lag
+    PHYSICS_LIMIT: 400,
     DMG_TEXT: {
       LIFE: 35,
       VY: -3.5,
@@ -118,42 +99,43 @@ CFG.ARENA_BOUNDS = {
 
 export const PALETTE = {
   TEXT: 0xffffff,
-  NEON: 0x00ccff,
+  NEON: 0x00e5ff,
   ALERT: 0xff0055,
-  MUTED: 0xaaaaaa,
-  CARD_BG: 0x0b0b14,
-  BORDER: 0x2a2a3e,
+  MUTED: 0x888899,
+  CARD_BG: 0x0d0d16,
+  BORDER: 0x242436,
   HP: {
-    HIGH: 0x00ff55,
-    MID: 0xffff00,
-    LOW: 0xff0055,
-    BG: 0x111118,
+    HIGH: 0x00ff66,
+    MID: 0xffdd00,
+    LOW: 0xff1155,
+    BG: 0x12121a,
     EMPTY: 0x222230
   }
 };
 
+// High-DPI font styles with crisp outlines and high resolution to eliminate all blur
 export const UI_STYLE = {
   H1: new PIXI.TextStyle({
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: 24,
+    fontSize: 22,
     fill: PALETTE.TEXT,
     stroke: 0x000000,
     strokeThickness: 3,
-    letterSpacing: 1,
-    padding: 8
+    letterSpacing: 2,
+    padding: 6
   }),
   H2: new PIXI.TextStyle({
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: 16,
+    fontSize: 15,
     fill: PALETTE.NEON,
     stroke: 0x000000,
     strokeThickness: 2.5,
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     padding: 6
   }),
   H3: new PIXI.TextStyle({
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: 12,
+    fontSize: 11,
     fill: PALETTE.NEON,
     stroke: 0x000000,
     strokeThickness: 2,
@@ -170,12 +152,12 @@ export const UI_STYLE = {
   }),
   DESC_LARGE: new PIXI.TextStyle({
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: 10,
-    fill: PALETTE.TEXT,
+    fontSize: 9,
+    fill: 0xcccccc,
     stroke: 0x000000,
     strokeThickness: 1.5,
     wordWrap: true,
-    wordWrapWidth: 260,
+    wordWrapWidth: 215,
     lineHeight: 14,
     padding: 4
   }),

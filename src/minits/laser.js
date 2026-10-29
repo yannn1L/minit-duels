@@ -35,7 +35,7 @@ export const MINIT_LASER = {
   },
 
   textures: {
-    base: (g, c) => MINIT_ICONS.laser(g, c)
+    base: './assets/minit_icon/laser.png'
   },
 
   customTextures: {

@@ -1,12 +1,11 @@
 // ============================================================
-// EDITOR / CHARACTER SELECT SCENE (ES Module)
+// EDITOR / CHARACTER SELECT SCENE (ES Module - Crisp HD Pixel)
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG, PALETTE, UI_STYLE } from '../config.js';
 import { AudioSys } from '../engine/AudioSys.js';
 import { MinitEngine } from '../engine/Registry.js';
 import { Textures } from '../engine/AssetBaker.js';
-import { Shaders } from '../filters/Filters.js';
 
 export class EditorScene extends PIXI.Container {
   constructor(onStartDuel) {
@@ -15,14 +14,16 @@ export class EditorScene extends PIXI.Container {
     this.cb = onStartDuel;
     const l = CFG.LAYOUT.EDITOR;
 
-    // Title
+    // Title (High-DPI resolution: 2 for razor-sharp pixel typography)
     const ttl = new PIXI.Text('MINIT DUELS', UI_STYLE.H1);
+    ttl.resolution = 2;
     ttl.anchor.set(0.5, 0);
     ttl.position.set(l.title.x, l.title.y);
     this.addChild(ttl);
 
     // Subtitle
     const sub = new PIXI.Text('SELECT 2 MINITS TO DUEL', UI_STYLE.STATS_LARGE);
+    sub.resolution = 2;
     sub.anchor.set(0.5, 0);
     sub.position.set(l.subtitle.x, l.subtitle.y);
     this.addChild(sub);
@@ -54,11 +55,11 @@ export class EditorScene extends PIXI.Container {
       const r = Math.floor(i / L.COLS);
       const cd = this._createCard(0, 0, L.BASE_W, L.BASE_H, m);
       cd.scale.set(L.SCALE);
-      cd.position.set(sX + c * (cW + L.GAP_X), L.START_Y + r * (cH + L.GAP_Y));
+      cd.position.set(Math.round(sX + c * (cW + L.GAP_X)), Math.round(L.START_Y + r * (cH + L.GAP_Y)));
       this.sC.addChild(cd);
     });
 
-    // Scroll handling
+    // Smooth scroll handling without jitter
     let dragY = 0;
     let baseY = 0;
     this.sC.on('pointerdown', (e) => {
@@ -77,8 +78,9 @@ export class EditorScene extends PIXI.Container {
     this.sC.on('pointerup', releaseDrag);
     this.sC.on('pointerupoutside', releaseDrag);
 
-    // Selected indicator
+    // Selected indicator label
     const stT = new PIXI.Text('SELECTED:', { ...UI_STYLE.H2, fill: PALETTE.TEXT });
+    stT.resolution = 2;
     stT.anchor.set(0.5, 0);
     stT.position.set(l.selectedTxt.x, l.selectedTxt.y);
     this.addChild(stT);
@@ -97,11 +99,12 @@ export class EditorScene extends PIXI.Container {
 
   _createButton(txt, x, y, act) {
     const b = new PIXI.Container();
-    b.position.set(x, y);
+    b.position.set(Math.round(x), Math.round(y));
     b.eventMode = 'static';
     b.cursor = 'pointer';
 
     const t = new PIXI.Text(txt, { ...UI_STYLE.H2, fill: PALETTE.TEXT });
+    t.resolution = 2;
     t.anchor.set(0.5);
 
     const bgW = t.width + CFG.UI.BTN.PAD_X * 2;
@@ -131,24 +134,24 @@ export class EditorScene extends PIXI.Container {
     c.eventMode = 'static';
     c.cursor = 'pointer';
 
-    // Background
+    // Crisp card body with double-border pixel framing (zero shader blur)
     const bg = new PIXI.Graphics()
       .beginFill(PALETTE.CARD_BG)
-      .lineStyle(1.5, PALETTE.BORDER, 1)
+      .lineStyle(2, PALETTE.BORDER, 1)
       .drawRoundedRect(0, 0, w, h, 4)
       .endFill();
     const bdr = new PIXI.Graphics().beginFill(d.color).drawRect(0, 0, 5, h).endFill();
     c.addChild(bg, bdr);
 
-    // Icon
+    // 16x16 Pixel Art Icon with integer scaling & nearest-neighbor sampling
     const icTex = Textures[`minit_${d.id}_base`];
     const ic = new PIXI.Sprite(icTex || PIXI.Texture.WHITE);
     ic.anchor.set(0.5);
     ic.scale.set(L.ICON.SCALE);
-    ic.position.set(L.ICON.X, L.ICON.Y);
+    ic.position.set(Math.round(L.ICON.X), Math.round(L.ICON.Y));
     c.addChild(ic);
 
-    // Selection corner
+    // Selection corner indicators
     const cor = new PIXI.Graphics()
       .beginFill(PALETTE.NEON)
       .drawRect(0, 0, 14, 4)
@@ -163,14 +166,16 @@ export class EditorScene extends PIXI.Container {
     cor.visible = false;
     c.addChild(cor);
 
-    // Name
+    // Card Name (High-DPI resolution: 2)
     const nm = new PIXI.Text(d.name, { ...UI_STYLE.H3, fill: d.color });
-    nm.position.set(L.NAME.X, L.NAME.Y);
+    nm.resolution = 2;
+    nm.position.set(Math.round(L.NAME.X), Math.round(L.NAME.Y));
     c.addChild(nm);
 
-    // Description
+    // Card Description (High-DPI resolution: 2)
     const ds = new PIXI.Text(d.desc, UI_STYLE.DESC_LARGE);
-    ds.position.set(L.DESC.X, L.DESC.Y);
+    ds.resolution = 2;
+    ds.position.set(Math.round(L.DESC.X), Math.round(L.DESC.Y));
     c.addChild(ds);
 
     // Click handler
@@ -186,26 +191,35 @@ export class EditorScene extends PIXI.Container {
         if (c.isS) {
           c.isS = false;
           cor.visible = false;
+          bg.tint = 0xffffff;
           this.sel = this.sel.filter((id) => id !== d.id);
         } else if (this.sel.length < 2) {
           c.isS = true;
           cor.visible = true;
+          bg.tint = 0x1a2a3a;
           this.sel.push(d.id);
         }
 
-        // Update selected indicators
+        // Update selected icons preview
         this.iC.removeChildren();
         this.sel.forEach((id, idx) => {
           const sp = new PIXI.Sprite(Textures[`minit_${id}_base`]);
           sp.anchor.set(0.5);
-          sp.scale.set(2);
-          sp.x = idx * 50 - (this.sel.length - 1) * 25;
+          sp.scale.set(2.2);
+          sp.x = Math.round(idx * 50 - (this.sel.length - 1) * 25);
           this.iC.addChild(sp);
         });
 
         this.bD.visible = this.sel.length === 2;
       }
       c.pD = false;
+    });
+
+    c.on('pointerover', () => {
+      if (!c.isS) bg.tint = 0x161624;
+    });
+    c.on('pointerout', () => {
+      if (!c.isS) bg.tint = 0xffffff;
     });
 
     c.on('pointerupoutside', () => (c.pD = false));

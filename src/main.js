@@ -1,5 +1,6 @@
 // ============================================================
 // MINIT DUELS - MAIN APPLICATION ENTRY POINT (ES Module)
+// Crisp HD Pixel Art Engine - Zero Blur, Zero Jitter, Zero Bleed
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG } from './config.js';
@@ -7,57 +8,48 @@ import { AudioSys } from './engine/AudioSys.js';
 import { registerBaseAssets } from './engine/AssetTemplate.js';
 import { registerTraitsAndTargeting } from './engine/traitBeh.js';
 import { registerAllMinits } from './minits/index.js';
-import { CRTFilter } from './filters/Filters.js';
 import { LoadingScene } from './scenes/LoadingScene.js';
 import { EditorScene } from './scenes/EditorScene.js';
 import { SimulationScene } from './scenes/SimulationScene.js';
 
-// Setup PIXI defaults for crisp pixel art
+// Setup PIXI defaults for razor-sharp HD pixel art
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
-PIXI.settings.ROUND_PIXELS = true;
+PIXI.settings.WRAP_MODE = PIXI.WRAP_MODES.CLAMP;
+// Setting ROUND_PIXELS to false prevents subpixel snapping jitter during smooth motion
+PIXI.settings.ROUND_PIXELS = false;
 
 // Initialize Core Registries
 registerBaseAssets();
 registerTraitsAndTargeting();
 registerAllMinits();
 
-// Create PIXI Application
+// Create PIXI Application with High-DPI support for crisp HD text and pixel clarity
 const canvas = document.getElementById('gameCanvas');
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
 const app = new PIXI.Application({
   view: canvas,
   resizeTo: window,
   backgroundColor: CFG.APP.BG_COLOR,
-  resolution: Math.min(window.devicePixelRatio || 1, 2),
+  resolution: dpr,
   autoDensity: true,
   antialias: false,
   powerPreference: 'high-performance'
 });
 
-const bgContainer = new PIXI.Container();
+// Crisp scaling for renderer
+app.renderer.texture.defaultScaleMode = PIXI.SCALE_MODES.NEAREST;
+
 const gameContainer = new PIXI.Container();
-app.stage.addChild(bgContainer, gameContainer);
+app.stage.addChild(gameContainer);
 
-// CRT Filter
-const crtFilter = new CRTFilter();
-app.stage.filters = [crtFilter];
-app.ticker.add((d) => crtFilter.update(d));
-
-// Global Background Tiling Sprite
-const globalBg = new PIXI.TilingSprite(PIXI.Texture.EMPTY, window.innerWidth, window.innerHeight);
-globalBg.alpha = 0.5;
-bgContainer.addChild(globalBg);
-
-// Responsive Resizing
+// Integer-aligned responsive resizing to eliminate edge jitter
 function handleResize() {
   app.renderer.resize(window.innerWidth, window.innerHeight);
-  if (globalBg.texture !== PIXI.Texture.EMPTY) {
-    globalBg.width = window.innerWidth;
-    globalBg.height = window.innerHeight;
-  }
   const scale = Math.min(window.innerWidth / CFG.APP.W, window.innerHeight / CFG.APP.H);
   gameContainer.scale.set(scale);
-  gameContainer.x = (window.innerWidth - CFG.APP.W * scale) / 2;
-  gameContainer.y = (window.innerHeight - CFG.APP.H * scale) / 2;
+  gameContainer.x = Math.round((window.innerWidth - CFG.APP.W * scale) / 2);
+  gameContainer.y = Math.round((window.innerHeight - CFG.APP.H * scale) / 2);
 }
 
 window.addEventListener('resize', handleResize);
@@ -85,9 +77,9 @@ window.addEventListener('pointerdown', unlockAudio);
 window.addEventListener('keydown', unlockAudio);
 
 // Boot game sequence
-console.log('⚔️ Booting Minit Duels ES Modules...');
+console.log('⚔️ Booting Minit Duels HD Pixel Edition...');
 setScene(
-  new LoadingScene(app, bgContainer, globalBg, () => {
+  new LoadingScene(app, () => {
     goToEditor();
   })
 );

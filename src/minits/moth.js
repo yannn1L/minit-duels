@@ -49,11 +49,11 @@ export const MINIT_MOTH = {
   },
 
   textures: {
-    base: (g, c) => MINIT_ICONS.moth_egg(g, c)
+    base: './assets/minit_icon/egg-stage-moth.png'
   },
 
   customTextures: {
-    minit_moth_mythical: (g, c = 0x88ffcc) => MINIT_ICONS.moth_hatch(g, c),
+    minit_moth_mythical: './assets/minit_icon/hatch-stage-moth.png',
     fx_moth_spore: (g) => g.beginFill(0x88ffcc).drawCircle(0, 0, 2.5).endFill(),
     fx_moth_bomb: (g) => g.beginFill(0xffffff).drawCircle(0, 0, 5).endFill()
   },

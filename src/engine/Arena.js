@@ -1,5 +1,5 @@
 // ============================================================
-// ARENA & COMBAT SIMULATION (ES Module)
+// ARENA & COMBAT SIMULATION (ES Module - Crisp HD Pixel Edition)
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG } from '../config.js';
@@ -7,7 +7,6 @@ import { FastMath } from './FastMath.js';
 import { AudioSys } from './AudioSys.js';
 import { VFXPool } from './VFXPool.js';
 import { MinitEngine } from './Registry.js';
-import { Shaders } from '../filters/Filters.js';
 
 export class Arena extends PIXI.Container {
   constructor(pIds, texturesRef) {
@@ -21,12 +20,14 @@ export class Arena extends PIXI.Container {
     this.view = new PIXI.Container();
     this.addChild(this.view);
 
-    // Background
+    // Background Arena Board with crisp borders (No outline shaders)
     const bg = new PIXI.Graphics()
       .beginFill(CFG.ARENA.BG_COLOR, CFG.ARENA.BG_ALPHA)
+      .lineStyle(2, CFG.ARENA.GUARD_COLOR, 1)
       .drawRect(-2, -2, AW + 4, AH + 4)
       .endFill();
 
+    // Arena Corner Guards
     const gL = 16;
     const gT = 4;
     bg.beginFill(CFG.ARENA.GUARD_COLOR)
@@ -42,14 +43,14 @@ export class Arena extends PIXI.Container {
 
     this.view.addChild(bg);
 
-    // Mask layer
+    // Arena Interior Layer
     const mask = new PIXI.Graphics().beginFill(0xffffff).drawRect(0, 0, AW, AH).endFill();
     this.view.addChild(mask);
     this.layer = new PIXI.Container();
     this.layer.mask = mask;
     this.view.addChild(this.layer);
 
-    // Grid
+    // Grid Floor
     const grid = new PIXI.Graphics().lineStyle(1, CFG.ARENA.GRID_COLOR, CFG.ARENA.GRID_ALPHA);
     for (let x = 1; x < CFG.GRID.COLS; x++) {
       grid.moveTo(x * CFG.GRID.TS, 0).lineTo(x * CFG.GRID.TS, AH);
@@ -62,16 +63,13 @@ export class Arena extends PIXI.Container {
     this.fxU = new PIXI.Container();
     this.layer.addChild(this.fxU);
 
-    // Players
+    // Players - 100% shader-free for crystal-clear HD pixel sprites
     this.players = [];
     pIds.forEach((id, idx) => {
       const md = MinitEngine.Registry.minits[id];
       const tex = this.textures[`minit_${id}_base`];
       const spr = new PIXI.Sprite(tex || PIXI.Texture.WHITE);
       spr.anchor.set(0.5);
-
-      const uS = Shaders.getUnit(1);
-      spr.filters = [uS];
       this.layer.addChild(spr);
 
       const sX = idx === 0 ? 3 : CFG.GRID.COLS - 4;
@@ -91,7 +89,6 @@ export class Arena extends PIXI.Container {
         spr: spr,
         baseScale: 1.0,
         aS: { x: 1, y: 1, tX: 1, tY: 1 },
-        shader: uS,
         fT: 0,
         activeStatuses: new Set(),
         debuffs: {}
@@ -336,6 +333,7 @@ export class Arena extends PIXI.Container {
       const pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
       const pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
 
+      // Smooth lerp without jitter
       p.spr.x += (pX - p.spr.x) * CFG.RENDER.LERP * tS;
       p.spr.y += (pY - p.spr.y) * CFG.RENDER.LERP * tS;
 
@@ -346,11 +344,12 @@ export class Arena extends PIXI.Container {
       p.aS.y += (p.aS.tY - p.aS.y) * CFG.RENDER.SPRING_DAMP * tS;
       p.spr.scale.set(p.aS.x, p.aS.y);
 
+      // Clean hit flash without shaders
       if (p.fT > 0) {
         p.fT -= tS;
-        p.shader.uniforms.uFlash = Math.max(0, p.fT / CFG.JUICE.HIT_FLASH_DUR);
+        p.spr.tint = 0xffffff;
       } else {
-        p.shader.uniforms.uFlash = 0;
+        p.spr.tint = 0xffffff;
       }
     });
 
@@ -364,12 +363,14 @@ export class Arena extends PIXI.Container {
     }
 
     if (this.shake > 0) {
-      this.view.position.set(
-        FastMath.randRange(-this.shake / 2, this.shake / 2),
-        FastMath.randRange(-this.shake / 2, this.shake / 2)
-      );
+      const sx = Math.round(FastMath.randRange(-this.shake / 2, this.shake / 2));
+      const sy = Math.round(FastMath.randRange(-this.shake / 2, this.shake / 2));
+      this.view.position.set(sx, sy);
       this.shake *= Math.pow(0.8, tS);
-      if (this.shake < 0.5) this.shake = 0;
+      if (this.shake < 0.5) {
+        this.shake = 0;
+        this.view.position.set(0, 0);
+      }
     } else {
       this.view.position.set(0, 0);
     }

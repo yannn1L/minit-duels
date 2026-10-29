@@ -30,7 +30,7 @@ export const MINIT_MURASAKI = {
   action: { cd: 360, count: 1, speed: 0, life: 180, traitList: ['hollowPurpleSequence'] },
 
   textures: {
-    base: (g, c) => MINIT_ICONS.murasaki(g, c)
+    base: './assets/minit_icon/murasaki.png'
   },
 
   customTextures: {
@@ -166,10 +166,8 @@ export const MINIT_MURASAKI = {
           a.hitStop = 8;
         }
 
-        owner.spr.x += FastMath.randRange(-1.5, 1.5);
-        owner.spr.y += FastMath.randRange(-1.5, 1.5);
-        owner.x -= Math.cos(angle) * 0.015;
-        owner.y -= Math.sin(angle) * 0.015;
+        owner.x -= Math.cos(angle) * 0.03;
+        owner.y -= Math.sin(angle) * 0.03;
 
         // Optimized beam: 20 beam points spaced 24px apart instead of 40 points
         // Eliminates the 3,200 particle flood while looking equally luminous!

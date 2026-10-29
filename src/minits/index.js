@@ -9,6 +9,7 @@ import { MINIT_ABSORB } from './absorb.js';
 import { MINIT_WAVES } from './waves.js';
 import { MINIT_MOTH } from './moth.js';
 import { MINIT_MURASAKI } from './murasaki.js';
+import { MINIT_IRONMEN } from './ironmen.js';
 
 export const ALL_MINITS = [
   MINIT_ALCHEMIST,
@@ -17,7 +18,8 @@ export const ALL_MINITS = [
   MINIT_ABSORB,
   MINIT_WAVES,
   MINIT_MOTH,
-  MINIT_MURASAKI
+  MINIT_MURASAKI,
+  MINIT_IRONMEN
 ];
 
 export function registerAllMinits() {

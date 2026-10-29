@@ -42,7 +42,7 @@ export const MINIT_PULSAR = {
   },
 
   textures: {
-    base: (g, c) => MINIT_ICONS.pulsar(g, c),
+    base: './assets/minit_icon/pulsar.png',
     turret: (g, c) => {
       g.lineStyle(2, 0xffffff, 1).drawRect(-6, -6, 8, 8);
       g.lineStyle(1, c, 1).drawRect(-6, -6, 9, 9);

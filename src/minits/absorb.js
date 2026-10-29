@@ -51,7 +51,7 @@ export const MINIT_ABSORB = {
   },
 
   textures: {
-    base: (g, c) => MINIT_ICONS.absorb(g, c)
+    base: './assets/minit_icon/absorb.png'
   },
 
   customTextures: {

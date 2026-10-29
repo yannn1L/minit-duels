@@ -1,5 +1,5 @@
 // ============================================================
-// SIMULATION / COMBAT SCENE (ES Module)
+// SIMULATION / COMBAT SCENE (ES Module - Crisp HD Pixel)
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG, PALETTE, UI_STYLE } from '../config.js';
@@ -17,8 +17,9 @@ export class SimulationScene extends PIXI.Container {
     this.isS = false;
     const l = CFG.LAYOUT.DUEL;
 
-    // Title
+    // Title (High-DPI resolution: 2)
     const tt = new PIXI.Text('MINIT DUELS!', UI_STYLE.H1);
+    tt.resolution = 2;
     tt.anchor.set(0.5, 0);
     tt.position.set(l.title.x, l.title.y);
     this.addChild(tt);
@@ -39,14 +40,14 @@ export class SimulationScene extends PIXI.Container {
       const md = MinitEngine.Registry.minits[id];
       const cP = idx === 0 ? l.p1_card : l.p2_card;
       const c = new PIXI.Container();
-      c.position.set(cP.x, cP.y);
+      c.position.set(Math.round(cP.x), Math.round(cP.y));
 
       const L = CFG.UI.CARD_LAYOUT;
       c.pivot.set(L.BASE_W / 2, L.BASE_H / 2);
 
       const bg = new PIXI.Graphics()
         .beginFill(PALETTE.CARD_BG)
-        .lineStyle(1.5, PALETTE.BORDER, 1)
+        .lineStyle(2, PALETTE.BORDER, 1)
         .drawRoundedRect(0, 0, L.BASE_W, L.BASE_H, 4)
         .endFill();
       c.addChild(bg);
@@ -55,16 +56,17 @@ export class SimulationScene extends PIXI.Container {
       const ic = new PIXI.Sprite(Textures[`minit_${md.id}_base`] || PIXI.Texture.WHITE);
       ic.anchor.set(0.5);
       ic.scale.set(L.ICON.SCALE);
-      ic.position.set(L.ICON.X, L.ICON.Y);
+      ic.position.set(Math.round(L.ICON.X), Math.round(L.ICON.Y));
       c.addChild(ic);
 
       const nm = new PIXI.Text(`${md.name}`, { ...UI_STYLE.H3, fill: md.color });
-      nm.position.set(L.NAME.X, L.NAME.Y);
+      nm.resolution = 2;
+      nm.position.set(Math.round(L.NAME.X), Math.round(L.NAME.Y));
       c.addChild(nm);
 
       // Status container
       const stC = new PIXI.Container();
-      stC.position.set(L.NAME.X + nm.width + L.STATUS.OFFSET_X, L.NAME.Y + L.STATUS.OFFSET_Y);
+      stC.position.set(Math.round(L.NAME.X + nm.width + L.STATUS.OFFSET_X), Math.round(L.NAME.Y + L.STATUS.OFFSET_Y));
       c.addChild(stC);
 
       for (let i = 0; i < 5; i++) {
@@ -75,12 +77,13 @@ export class SimulationScene extends PIXI.Container {
         stC.addChild(sic);
       }
 
-      // HP Bar
+      // HP Bar with crisp segments
       const hpC = new PIXI.Container();
-      hpC.position.set(L.HP_BAR.X, L.HP_BAR.Y);
+      hpC.position.set(Math.round(L.HP_BAR.X), Math.round(L.HP_BAR.Y));
 
       const hbB = new PIXI.Graphics()
         .beginFill(PALETTE.HP.BG)
+        .lineStyle(1, PALETTE.BORDER, 1)
         .drawRect(0, 0, L.HP_BAR.W, L.HP_BAR.H)
         .endFill();
 
@@ -100,7 +103,8 @@ export class SimulationScene extends PIXI.Container {
       c.addChild(hpC);
 
       const ds = new PIXI.Text(md.desc, UI_STYLE.DESC_LARGE);
-      ds.position.set(L.DESC.X, L.DESC.Y);
+      ds.resolution = 2;
+      ds.position.set(Math.round(L.DESC.X), Math.round(L.DESC.Y));
       c.addChild(ds);
 
       this.uC.push({ fg: hbF, max: md.stats.hp, stC: stC });
@@ -183,7 +187,7 @@ export class SimulationScene extends PIXI.Container {
     AudioSys.play('win');
 
     const overlay = new PIXI.Graphics()
-      .beginFill(0x000000, 0.6)
+      .beginFill(0x000000, 0.75)
       .drawRect(-window.innerWidth, -window.innerHeight, window.innerWidth * 3, window.innerHeight * 3)
       .endFill();
     overlay.eventMode = 'static';
@@ -209,17 +213,20 @@ export class SimulationScene extends PIXI.Container {
       this.wP.addChild(ic);
 
       const nm = new PIXI.Text(`${md.name} WINS!`, { ...UI_STYLE.H1, fill: md.color });
+      nm.resolution = 2;
       nm.anchor.set(0.5);
       nm.position.set(0, 40);
       this.wP.addChild(nm);
     } else {
       const nm = new PIXI.Text('DRAW!', { ...UI_STYLE.H1, fill: PALETTE.MUTED });
+      nm.resolution = 2;
       nm.anchor.set(0.5);
       nm.position.set(0, 0);
       this.wP.addChild(nm);
     }
 
     const tip = new PIXI.Text('CLICK ANYWHERE TO REMATCH', UI_STYLE.STATS_LARGE);
+    tip.resolution = 2;
     tip.anchor.set(0.5);
     tip.position.set(0, 80);
     this.wP.addChild(tip);
@@ -228,7 +235,7 @@ export class SimulationScene extends PIXI.Container {
     setTimeout(() => {
       this.addChild(overlay, this.wP);
       this.sP = true;
-    }, 80);
+    }, 60);
   }
 
   cleanup() {

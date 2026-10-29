@@ -43,7 +43,7 @@ export const MINIT_WAVES = {
   action: { cd: 140, count: 1, speed: 0, life: 60, traitList: ['wavesChargePhase'] },
 
   textures: {
-    base: (g, c) => MINIT_ICONS.waves(g, c)
+    base: './assets/minit_icon/waves.png'
   },
 
   customTextures: {
