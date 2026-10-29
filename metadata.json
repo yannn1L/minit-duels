@@ -1,0 +1,8 @@
+{
+  "name": "Minit Duels!",
+  "description": "Minit Duels - Fast-paced pixel art arena battle simulator with unique minits, traits, and synergies.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

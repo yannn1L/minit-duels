@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Minit Duels!</title>
+    <meta name="description" content="Minit Duels - Fast-paced pixel art arena battle simulator with unique minits, traits, and synergies." />
+    <meta property="og:title" content="Minit Duels!" />
+    <meta property="og:description" content="Minit Duels - Fast-paced pixel art arena battle simulator with unique minits, traits, and synergies." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #020202;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        font-family: 'Press Start 2P', monospace;
+      }
+      #app-wrapper {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
+      canvas#gameCanvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      #font-loader {
+        font-family: 'Press Start 2P', monospace;
+        visibility: hidden;
+        position: absolute;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="font-loader">LOAD</div>
+    <div id="app-wrapper">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
