@@ -3,7 +3,6 @@
 // ============================================================
 import { CFG } from '../config.js';
 import { FastMath } from '../engine/FastMath.js';
-import { MINIT_ICONS } from '../assets/icons.js';
 
 export const MINIT_ABSORB = {
   id: 'absorb',

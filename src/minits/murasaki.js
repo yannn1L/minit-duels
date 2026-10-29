@@ -4,7 +4,6 @@
 import { CFG } from '../config.js';
 import { FastMath } from '../engine/FastMath.js';
 import { AudioSys } from '../engine/AudioSys.js';
-import { MINIT_ICONS } from '../assets/icons.js';
 
 export const MINIT_MURASAKI = {
   id: 'murasaki',

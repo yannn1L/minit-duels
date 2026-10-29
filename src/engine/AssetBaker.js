@@ -4,7 +4,6 @@
 import * as PIXI from 'pixi.js';
 import { UI_STYLE } from '../config.js';
 import { MinitEngine } from './Registry.js';
-import { MINIT_ICONS } from '../assets/icons.js';
 
 export const Textures = {};
 
@@ -55,22 +54,7 @@ export class AssetBaker {
             }
             Textures[key] = tex;
           } catch (e) {
-            console.warn(`Could not load image ${url}, generating procedural fallback for ${key}`, e);
-            const minitKey = key.replace('minit_', '').replace('_base', '');
-            const fallback = MINIT_ICONS[minitKey];
-            if (fallback) {
-              gfx.clear();
-              fallback(gfx);
-              const baked = app.renderer.generateTexture(gfx, {
-                scaleMode: PIXI.SCALE_MODES.NEAREST,
-                resolution: 2
-              });
-              if (baked?.baseTexture) {
-                baked.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
-                baked.baseTexture.mipmap = PIXI.MIPMAP_MODES.OFF;
-              }
-              Textures[key] = baked;
-            }
+            console.warn(`Could not load image ${url} for ${key}`, e);
           }
         })
       );
