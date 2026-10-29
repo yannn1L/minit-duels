@@ -1,14 +1,24 @@
 // ============================================================
-// CONFIGURATION & CONSTANTS (ES Module - Crisp HD Pixel Tuning)
+// CONFIGURATION & CONSTANTS (ES Module - Data-Driven & Tweakable)
+// Supports both Landscape (Desktop) and Portrait (Mobile) modes
 // ============================================================
 import * as PIXI from 'pixi.js';
 
 export const CFG = {
-  APP: { W: 800, H: 600, BG_COLOR: 0x07070c },
+  // Virtual Canvas Resolutions
+  APP: {
+    LANDSCAPE: { W: 900, H: 540 },
+    PORTRAIT: { W: 540, H: 800 },
+    BG_COLOR: 0x07070c
+  },
+
+  // Grid & Physics (Tweakable)
   GRID: { TS: 16, HALF_TS: 8, COLS: 10, ROWS: 10 },
   RENDER: { LERP: 0.22, SPRING_TENSION: 0.2, SPRING_DAMP: 0.35 },
   SIM: { MAX_DT: 2.0, MAX_ITERATIONS: 3, SLOWMO_SPEED: 0.25, SLOWMO_DUR: 40 },
   PHYSICS: { DRAG_X: 0.9, DRAG_Y: 0.95, BOUNCE: -1, WANDER: 0.05 },
+
+  // Arena Dimensions & Styles
   ARENA: {
     BASE_HP: 1000,
     PADDING: 0.2,
@@ -18,6 +28,8 @@ export const CFG = {
     GRID_ALPHA: 0.8,
     GUARD_COLOR: 0x2a2a40
   },
+
+  // Combat Juice & Impacts (Tweakable)
   JUICE: {
     BOUNCE_X: { tX: 1.0, tY: 1.25 },
     BOUNCE_Y: { tX: 1.25, tY: 1.05 },
@@ -29,39 +41,132 @@ export const CFG = {
     HIT_STOP_DUR: 2,
     DEATH_HIT_STOP: 12
   },
+
+  // Button & UI Defaults
   UI: {
-    SCROLL: { Y: 110, H: 330 },
-    BTN: { PAD_X: 25, PAD_Y: 15 },
-    CARD_LAYOUT: {
-      BASE_W: 232,
-      BASE_H: 126,
-      SCALE: 0.78,
-      GAP_X: 14,
-      GAP_Y: 14,
-      COLS: 4,
-      START_Y: 120,
-      ICON: { X: 28, Y: 28, SCALE: 2.2 },
-      NAME: { X: 56, Y: 10 },
-      STATUS: { OFFSET_X: 8, OFFSET_Y: -1.1, SIZE: 12, GAP: 2 },
-      HP_BAR: { X: 56, Y: 28, W: 136, H: 10, SEGMENTS: 10, SEG_W: 10, PAD: 2, GAP: 3 },
-      DESC: { X: 10, Y: 52 }
-    }
+    BTN: { PAD_X: 22, PAD_Y: 12 }
   },
+
+  // ============================================================
+  // DATA-DRIVEN LAYOUTS: LANDSCAPE (DESKTOP) & PORTRAIT (MOBILE)
+  // Easy to tweak positions, scales, and margins
+  // ============================================================
   LAYOUT: {
+    // ----------------------------------------------------
+    // DUEL / COMBAT SCENE LAYOUT
+    // In landscape: Arena in center, cards on left and right!
+    // ----------------------------------------------------
     DUEL: {
-      title: { x: 400, y: -150 },
-      arena: { x: 400, y: 210, scale: 3.8 },
-      p1_card: { x: 254, y: 610 },
-      p2_card: { x: 546, y: 610 }
+      LANDSCAPE: {
+        title: { x: 450, y: 22 },
+        arena: { x: 450, y: 275, scale: 2.7 },
+        // P1 Card on the LEFT of the arena
+        p1_card: {
+          x: 125,
+          y: 275,
+          width: 205,
+          height: 250,
+          icon: { x: 102, y: 46, scale: 3.0 },
+          name: { x: 102, y: 88 },
+          hp: { x: 15, y: 110, w: 175, h: 12, segments: 10, segW: 14, gap: 3 },
+          desc: { x: 12, y: 136, wrapWidth: 180 },
+          status: { x: 15, y: 215, size: 14, gap: 4 }
+        },
+        // P2 Card on the RIGHT of the arena
+        p2_card: {
+          x: 775,
+          y: 275,
+          width: 205,
+          height: 250,
+          icon: { x: 102, y: 46, scale: 3.0 },
+          name: { x: 102, y: 88 },
+          hp: { x: 15, y: 110, w: 175, h: 12, segments: 10, segW: 14, gap: 3 },
+          desc: { x: 12, y: 136, wrapWidth: 180 },
+          status: { x: 15, y: 215, size: 14, gap: 4 }
+        }
+      },
+      PORTRAIT: {
+        title: { x: 270, y: -25 },
+        arena: { x: 270, y: 255, scale: 2.7 },
+        p1_card: {
+          x: 140,
+          y: 575,
+          width: 230,
+          height: 140,
+          icon: { x: 34, y: 34, scale: 2.4 },
+          name: { x: 68, y: 15 },
+          hp: { x: 68, y: 36, w: 145, h: 10, segments: 10, segW: 10, gap: 3 },
+          desc: { x: 14, y: 65, wrapWidth: 202 },
+          status: { x: 14, y: 108, size: 12, gap: 3 }
+        },
+        p2_card: {
+          x: 400,
+          y: 575,
+          width: 230,
+          height: 140,
+          icon: { x: 34, y: 34, scale: 2.4 },
+          name: { x: 68, y: 15 },
+          hp: { x: 68, y: 36, w: 145, h: 10, segments: 10, segW: 10, gap: 3 },
+          desc: { x: 14, y: 65, wrapWidth: 202 },
+          status: { x: 14, y: 108, size: 12, gap: 3 }
+        }
+      }
     },
+
+    // ----------------------------------------------------
+    // COMPACT CHARACTER SELECT / EDITOR LAYOUT
+    // ----------------------------------------------------
     EDITOR: {
-      title: { x: 400, y: 35 },
-      subtitle: { x: 400, y: 75 },
-      selectedTxt: { x: 400, y: 465 },
-      indicator: { x: 400, y: 505 },
-      btnDuel: { x: 400, y: 560 }
+      LANDSCAPE: {
+        title: { x: 450, y: 20 },
+        subtitle: { x: 450, y: 48 },
+        scroll: { x: 0, y: 70, w: 900, h: 360 },
+        card: {
+          cols: 4,
+          baseW: 196,
+          baseH: 98,
+          scale: 1.0,
+          gapX: 30,
+          gapY: 12,
+          startY: 78,
+          icon: { x: 25, y: 25, scale: 2.0 },
+          name: { x: 52, y: 8 },
+          hp: { x: 52, y: 24, w: 125, h: 8, segments: 10, segW: 9, gap: 3 },
+          desc: { x: 10, y: 44, wrapWidth: 176 }
+        },
+        footer: {
+          selectedTxt: { x: 260, y: 470 },
+          indicator: { x: 380, y: 470 },
+          btnDuel: { x: 640, y: 470 }
+        }
+      },
+      PORTRAIT: {
+        title: { x: 270, y: 22 },
+        subtitle: { x: 270, y: 50 },
+        scroll: { x: 0, y: 78, w: 540, h: 560 },
+        card: {
+          cols: 2,
+          baseW: 236,
+          baseH: 104,
+          scale: 1.0,
+          gapX: 14,
+          gapY: 12,
+          startY: 84,
+          icon: { x: 28, y: 28, scale: 2.2 },
+          name: { x: 56, y: 10 },
+          hp: { x: 56, y: 28, w: 140, h: 9, segments: 10, segW: 10, gap: 3 },
+          desc: { x: 12, y: 48, wrapWidth: 212 }
+        },
+        footer: {
+          selectedTxt: { x: 270, y: 670 },
+          indicator: { x: 270, y: 706 },
+          btnDuel: { x: 270, y: 752 }
+        }
+      }
     }
   },
+
+  // Audio Throttle
   AUDIO: {
     MASTER_GAIN: 0.7,
     COMPRESSOR: { THRESHOLD: -12, RATIO: 4 },
@@ -74,6 +179,8 @@ export const CFG = {
       DEFAULT: 0.04
     }
   },
+
+  // Particle Effects Limits (Tweakable)
   VFX: {
     TEXT_LIMIT: 40,
     PHYSICS_LIMIT: 400,
@@ -113,11 +220,11 @@ export const PALETTE = {
   }
 };
 
-// High-DPI font styles with crisp outlines and high resolution to eliminate all blur
+// High-DPI font styles with crisp outlines and resolution: 2
 export const UI_STYLE = {
   H1: new PIXI.TextStyle({
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: 22,
+    fontSize: 20,
     fill: PALETTE.TEXT,
     stroke: 0x000000,
     strokeThickness: 3,
@@ -126,7 +233,7 @@ export const UI_STYLE = {
   }),
   H2: new PIXI.TextStyle({
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: 15,
+    fontSize: 14,
     fill: PALETTE.NEON,
     stroke: 0x000000,
     strokeThickness: 2.5,
@@ -152,13 +259,13 @@ export const UI_STYLE = {
   }),
   DESC_LARGE: new PIXI.TextStyle({
     fontFamily: '"Press Start 2P", monospace',
-    fontSize: 9,
+    fontSize: 8,
     fill: 0xcccccc,
     stroke: 0x000000,
     strokeThickness: 1.5,
     wordWrap: true,
-    wordWrapWidth: 215,
-    lineHeight: 14,
+    wordWrapWidth: 176,
+    lineHeight: 12,
     padding: 4
   }),
   DMG_POPUP: new PIXI.TextStyle({

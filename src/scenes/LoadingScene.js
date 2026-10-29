@@ -4,24 +4,28 @@
 import * as PIXI from 'pixi.js';
 import { CFG, UI_STYLE } from '../config.js';
 import { AssetBaker } from '../engine/AssetBaker.js';
+import { getIsLandscape } from '../main.js';
 
 export class LoadingScene extends PIXI.Container {
   constructor(app, onComplete) {
     super();
 
+    const isLandscape = getIsLandscape();
+    const dims = isLandscape ? CFG.APP.LANDSCAPE : CFG.APP.PORTRAIT;
+
     const t = new PIXI.Text('BOOTING SYSTEM...', UI_STYLE.H2);
     t.resolution = 2;
     t.anchor.set(0.5);
-    t.position.set(CFG.APP.W / 2, CFG.APP.H / 2);
+    t.position.set(dims.W / 2, dims.H / 2);
     this.addChild(t);
 
     Promise.race([
       document.fonts ? document.fonts.ready : Promise.resolve(),
-      new Promise((r) => setTimeout(r, 800))
+      new Promise((r) => setTimeout(r, 600))
     ]).then(async () => {
       await AssetBaker.bake(app);
       window.dispatchEvent(new Event('resize'));
-      setTimeout(onComplete, 120);
+      setTimeout(onComplete, 100);
     });
   }
 }

@@ -1,65 +1,99 @@
 // ============================================================
-// EDITOR / CHARACTER SELECT SCENE (ES Module - Crisp HD Pixel)
+// COMPACT CHARACTER SELECT / EDITOR SCENE (ES Module)
+// Responsive & Data-Driven: Supports Landscape & Portrait
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG, PALETTE, UI_STYLE } from '../config.js';
 import { AudioSys } from '../engine/AudioSys.js';
 import { MinitEngine } from '../engine/Registry.js';
 import { Textures } from '../engine/AssetBaker.js';
+import { getIsLandscape } from '../main.js';
 
 export class EditorScene extends PIXI.Container {
   constructor(onStartDuel) {
     super();
     this.sel = [];
     this.cb = onStartDuel;
-    const l = CFG.LAYOUT.EDITOR;
+    this.currentOrientation = null;
+    this.rebuild(getIsLandscape());
+  }
 
-    // Title (High-DPI resolution: 2 for razor-sharp pixel typography)
+  onResize(isLandscape) {
+    if (this.currentOrientation !== isLandscape) {
+      this.rebuild(isLandscape);
+    }
+  }
+
+  rebuild(isLandscape) {
+    this.currentOrientation = isLandscape;
+    this.removeChildren();
+
+    // Data-driven layout config
+    const L = isLandscape ? CFG.LAYOUT.EDITOR.LANDSCAPE : CFG.LAYOUT.EDITOR.PORTRAIT;
+
+    // Header Title
     const ttl = new PIXI.Text('MINIT DUELS', UI_STYLE.H1);
     ttl.resolution = 2;
     ttl.anchor.set(0.5, 0);
-    ttl.position.set(l.title.x, l.title.y);
+    ttl.position.set(L.title.x, L.title.y);
     this.addChild(ttl);
 
-    // Subtitle
+    // Header Subtitle
     const sub = new PIXI.Text('SELECT 2 MINITS TO DUEL', UI_STYLE.STATS_LARGE);
     sub.resolution = 2;
     sub.anchor.set(0.5, 0);
-    sub.position.set(l.subtitle.x, l.subtitle.y);
+    sub.position.set(L.subtitle.x, L.subtitle.y);
     this.addChild(sub);
 
-    // Scroll mask & container
+    // Scroll Area
     this.sM = new PIXI.Graphics()
       .beginFill(0xffffff)
-      .drawRect(0, CFG.UI.SCROLL.Y, CFG.APP.W, CFG.UI.SCROLL.H)
+      .drawRect(L.scroll.x, L.scroll.y, L.scroll.w, L.scroll.h)
       .endFill();
     this.addChild(this.sM);
 
     this.sC = new PIXI.Container();
     this.sC.mask = this.sM;
     this.sC.eventMode = 'static';
-    this.sC.hitArea = new PIXI.Rectangle(0, CFG.UI.SCROLL.Y, CFG.APP.W, CFG.UI.SCROLL.H);
+    this.sC.hitArea = new PIXI.Rectangle(L.scroll.x, L.scroll.y, L.scroll.w, L.scroll.h);
     this.addChild(this.sC);
 
-    // Cards Layout
-    const L = CFG.UI.CARD_LAYOUT;
-    const cW = L.BASE_W * L.SCALE;
-    const cH = L.BASE_H * L.SCALE;
+    // Cards Grid
     const mArr = Object.values(MinitEngine.Registry.minits);
-    const totW = cW * L.COLS + L.GAP_X * (L.COLS - 1);
-    const sX = (CFG.APP.W - totW) / 2;
-    this.mSY = Math.min(0, CFG.UI.SCROLL.H - Math.ceil(mArr.length / L.COLS) * (cH + L.GAP_Y));
+    const cCfg = L.card;
+    const cW = cCfg.baseW * cCfg.scale;
+    const cH = cCfg.baseH * cCfg.scale;
+    const cols = cCfg.cols;
+
+    const totW = cols * cW + (cols - 1) * cCfg.gapX;
+    const sX = (L.scroll.w - totW) / 2;
+
+    const numRows = Math.ceil(mArr.length / cols);
+    const totalContentH = numRows * (cH + cCfg.gapY);
+    this.mSY = Math.min(0, L.scroll.h - totalContentH - 20);
 
     mArr.forEach((m, i) => {
-      const c = i % L.COLS;
-      const r = Math.floor(i / L.COLS);
-      const cd = this._createCard(0, 0, L.BASE_W, L.BASE_H, m);
-      cd.scale.set(L.SCALE);
-      cd.position.set(Math.round(sX + c * (cW + L.GAP_X)), Math.round(L.START_Y + r * (cH + L.GAP_Y)));
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+
+      // Center cards if the last row has fewer items
+      let rowStartX = sX;
+      if (row === numRows - 1 && mArr.length % cols !== 0) {
+        const lastRowCols = mArr.length % cols;
+        const lastRowW = lastRowCols * cW + (lastRowCols - 1) * cCfg.gapX;
+        rowStartX = (L.scroll.w - lastRowW) / 2;
+      }
+
+      const cd = this._createCard(0, 0, cCfg.baseW, cCfg.baseH, m, cCfg);
+      cd.scale.set(cCfg.scale);
+      cd.position.set(
+        Math.round(rowStartX + col * (cW + cCfg.gapX)),
+        Math.round(cCfg.startY + row * (cH + cCfg.gapY))
+      );
       this.sC.addChild(cd);
     });
 
-    // Smooth scroll handling without jitter
+    // Touch & pointer scrolling
     let dragY = 0;
     let baseY = 0;
     this.sC.on('pointerdown', (e) => {
@@ -78,23 +112,42 @@ export class EditorScene extends PIXI.Container {
     this.sC.on('pointerup', releaseDrag);
     this.sC.on('pointerupoutside', releaseDrag);
 
-    // Selected indicator label
+    // Footer - Selected Indicator Label
+    const fCfg = L.footer;
     const stT = new PIXI.Text('SELECTED:', { ...UI_STYLE.H2, fill: PALETTE.TEXT });
     stT.resolution = 2;
-    stT.anchor.set(0.5, 0);
-    stT.position.set(l.selectedTxt.x, l.selectedTxt.y);
+    stT.anchor.set(0.5, 0.5);
+    stT.position.set(fCfg.selectedTxt.x, fCfg.selectedTxt.y);
     this.addChild(stT);
 
+    // Selected Icons Container
     this.iC = new PIXI.Container();
-    this.iC.position.set(l.indicator.x, l.indicator.y);
+    this.iC.position.set(fCfg.indicator.x, fCfg.indicator.y);
     this.addChild(this.iC);
 
-    // Start button
-    this.bD = this._createButton('START DUEL!', l.btnDuel.x, l.btnDuel.y, () =>
+    // Start Button
+    this.bD = this._createButton('START DUEL!', fCfg.btnDuel.x, fCfg.btnDuel.y, () =>
       this.cb(this.sel.slice(0, 2))
     );
-    this.bD.visible = false;
+    this.bD.visible = this.sel.length === 2;
     this.addChild(this.bD);
+
+    this._updateSelectedPreview();
+  }
+
+  _updateSelectedPreview() {
+    if (!this.iC) return;
+    this.iC.removeChildren();
+    this.sel.forEach((id, idx) => {
+      const sp = new PIXI.Sprite(Textures[`minit_${id}_base`] || PIXI.Texture.WHITE);
+      sp.anchor.set(0.5);
+      sp.scale.set(2.4);
+      sp.x = Math.round(idx * 48 - (this.sel.length - 1) * 24);
+      this.iC.addChild(sp);
+    });
+    if (this.bD) {
+      this.bD.visible = this.sel.length === 2;
+    }
   }
 
   _createButton(txt, x, y, act) {
@@ -127,56 +180,76 @@ export class EditorScene extends PIXI.Container {
     return b;
   }
 
-  _createCard(x, y, w, h, d) {
-    const L = CFG.UI.CARD_LAYOUT;
+  _createCard(x, y, w, h, d, cCfg) {
     const c = new PIXI.Container();
     c.position.set(x, y);
     c.eventMode = 'static';
     c.cursor = 'pointer';
 
-    // Crisp card body with double-border pixel framing (zero shader blur)
+    const isSelected = this.sel.includes(d.id);
+    c.isS = isSelected;
+
+    // Crisp card body
     const bg = new PIXI.Graphics()
       .beginFill(PALETTE.CARD_BG)
-      .lineStyle(2, PALETTE.BORDER, 1)
+      .lineStyle(2, isSelected ? PALETTE.NEON : PALETTE.BORDER, 1)
       .drawRoundedRect(0, 0, w, h, 4)
       .endFill();
-    const bdr = new PIXI.Graphics().beginFill(d.color).drawRect(0, 0, 5, h).endFill();
+    const bdr = new PIXI.Graphics().beginFill(d.color).drawRect(0, 0, 4, h).endFill();
     c.addChild(bg, bdr);
 
-    // 16x16 Pixel Art Icon with integer scaling & nearest-neighbor sampling
+    // 16x16 Pixel Art Icon
     const icTex = Textures[`minit_${d.id}_base`];
     const ic = new PIXI.Sprite(icTex || PIXI.Texture.WHITE);
     ic.anchor.set(0.5);
-    ic.scale.set(L.ICON.SCALE);
-    ic.position.set(Math.round(L.ICON.X), Math.round(L.ICON.Y));
+    ic.scale.set(cCfg.icon.scale);
+    ic.position.set(Math.round(cCfg.icon.x), Math.round(cCfg.icon.y));
     c.addChild(ic);
 
-    // Selection corner indicators
-    const cor = new PIXI.Graphics()
-      .beginFill(PALETTE.NEON)
-      .drawRect(0, 0, 14, 4)
-      .drawRect(0, 0, 4, 14)
-      .drawRect(w - 14, 0, 14, 4)
-      .drawRect(w - 4, 0, 4, 14)
-      .drawRect(0, h - 4, 14, 4)
-      .drawRect(0, h - 14, 4, 14)
-      .drawRect(w - 14, h - 4, 14, 4)
-      .drawRect(w - 4, h - 14, 4, 14)
-      .endFill();
-    cor.visible = false;
-    c.addChild(cor);
-
-    // Card Name (High-DPI resolution: 2)
+    // Name Label
     const nm = new PIXI.Text(d.name, { ...UI_STYLE.H3, fill: d.color });
     nm.resolution = 2;
-    nm.position.set(Math.round(L.NAME.X), Math.round(L.NAME.Y));
+    nm.position.set(Math.round(cCfg.name.x), Math.round(cCfg.name.y));
     c.addChild(nm);
 
-    // Card Description (High-DPI resolution: 2)
-    const ds = new PIXI.Text(d.desc, UI_STYLE.DESC_LARGE);
+    // HP Mini Bar
+    const hpC = new PIXI.Container();
+    hpC.position.set(Math.round(cCfg.hp.x), Math.round(cCfg.hp.y));
+    const hpBg = new PIXI.Graphics()
+      .beginFill(PALETTE.HP.BG)
+      .drawRect(0, 0, cCfg.hp.w, cCfg.hp.h)
+      .endFill();
+    hpBg.beginFill(PALETTE.HP.HIGH);
+    for (let s = 0; s < cCfg.hp.segments; s++) {
+      hpBg.drawRect(s * (cCfg.hp.segW + cCfg.hp.gap), 0, cCfg.hp.segW, cCfg.hp.h);
+    }
+    hpBg.endFill();
+    hpC.addChild(hpBg);
+    c.addChild(hpC);
+
+    // Description text
+    const ds = new PIXI.Text(d.desc, {
+      ...UI_STYLE.DESC_LARGE,
+      wordWrapWidth: cCfg.desc.wrapWidth
+    });
     ds.resolution = 2;
-    ds.position.set(Math.round(L.DESC.X), Math.round(L.DESC.Y));
+    ds.position.set(Math.round(cCfg.desc.x), Math.round(cCfg.desc.y));
     c.addChild(ds);
+
+    // Corner Selection Indicators
+    const cor = new PIXI.Graphics()
+      .beginFill(PALETTE.NEON)
+      .drawRect(0, 0, 12, 3)
+      .drawRect(0, 0, 3, 12)
+      .drawRect(w - 12, 0, 12, 3)
+      .drawRect(w - 3, 0, 3, 12)
+      .drawRect(0, h - 3, 12, 3)
+      .drawRect(0, h - 12, 3, 12)
+      .drawRect(w - 12, h - 3, 12, 3)
+      .drawRect(w - 3, h - 12, 3, 12)
+      .endFill();
+    cor.visible = isSelected;
+    c.addChild(cor);
 
     // Click handler
     c.on('pointerdown', (e) => {
@@ -196,27 +269,16 @@ export class EditorScene extends PIXI.Container {
         } else if (this.sel.length < 2) {
           c.isS = true;
           cor.visible = true;
-          bg.tint = 0x1a2a3a;
+          bg.tint = 0x162230;
           this.sel.push(d.id);
         }
-
-        // Update selected icons preview
-        this.iC.removeChildren();
-        this.sel.forEach((id, idx) => {
-          const sp = new PIXI.Sprite(Textures[`minit_${id}_base`]);
-          sp.anchor.set(0.5);
-          sp.scale.set(2.2);
-          sp.x = Math.round(idx * 50 - (this.sel.length - 1) * 25);
-          this.iC.addChild(sp);
-        });
-
-        this.bD.visible = this.sel.length === 2;
+        this._updateSelectedPreview();
       }
       c.pD = false;
     });
 
     c.on('pointerover', () => {
-      if (!c.isS) bg.tint = 0x161624;
+      if (!c.isS) bg.tint = 0x161622;
     });
     c.on('pointerout', () => {
       if (!c.isS) bg.tint = 0xffffff;
