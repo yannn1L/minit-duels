@@ -185,15 +185,18 @@ export class Arena extends PIXI.Container {
     if (playSound) AudioSys.play('hit', 0.8);
   }
 
-  damagePlayer(pid, payload, fxC) {
+  damagePlayer(pid, payload = {}, fxC) {
     const p = this.players.find((pl) => pl.id === pid);
     if (!p || p.hp <= 0) return;
 
-    p.hp = Math.max(0, p.hp - payload.dmg);
+    const dmg = payload.dmg || 0;
+    p.hp = Math.max(0, p.hp - dmg);
     const pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
     const pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+    const vfx = payload.hitVfx || {};
+
     if (!this.isHeadless) {
-      if (vfx.showText !== false) this.fxPool.spawnDmgText(pX, pY, payload.dmg, fxC);
+      if (vfx.showText !== false) this.fxPool.spawnDmgText(pX, pY, dmg, fxC);
       if (vfx.playSound !== false) AudioSys.play(vfx.sound || 'hit', 0.6);
     }
 
