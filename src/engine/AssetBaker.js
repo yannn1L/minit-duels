@@ -35,26 +35,21 @@ export class AssetBaker {
       await Promise.all(
         externalLoads.map(async ({ key, url }) => {
           try {
-            let tex;
-            try {
-              tex = await PIXI.Assets.load(url);
-            } catch (err) {
-              tex = PIXI.Texture.from(url);
-            }
-
-            // CRITICAL for pixel perfection:
-            // 1. NEAREST scale mode - sharp pixel edges
-            // 2. CLAMP wrap mode - eliminates texture edge bleeding
-            // 3. MIPMAP OFF - prevents downsampling blur
+            const tex = PIXI.Texture.from(url);
             if (tex?.baseTexture) {
               tex.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
               tex.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
               tex.baseTexture.mipmap = PIXI.MIPMAP_MODES.OFF;
-              tex.baseTexture.update();
+              if (!tex.baseTexture.valid) {
+                await new Promise((resolve) => {
+                  tex.baseTexture.once('loaded', () => resolve());
+                  tex.baseTexture.once('error', () => resolve());
+                });
+              }
             }
             Textures[key] = tex;
           } catch (e) {
-            console.warn(`Could not load image ${url} for ${key}`, e);
+            console.warn(`Could not load texture ${url} for ${key}`);
           }
         })
       );

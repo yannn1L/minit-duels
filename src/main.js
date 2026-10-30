@@ -13,9 +13,11 @@ import { EditorScene } from './scenes/EditorScene.js';
 import { SimulationScene } from './scenes/SimulationScene.js';
 import { DevConsole } from './dev/DevConsole.js';
 
-// Setup PIXI defaults for crisp HD pixel art
-PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
-PIXI.settings.WRAP_MODE = PIXI.WRAP_MODES.CLAMP;
+// Setup PIXI defaults for crisp HD pixel art (without deprecation warnings)
+if (PIXI.BaseTexture?.defaultOptions) {
+  PIXI.BaseTexture.defaultOptions.scaleMode = PIXI.SCALE_MODES.NEAREST;
+  PIXI.BaseTexture.defaultOptions.wrapMode = PIXI.WRAP_MODES.CLAMP;
+}
 PIXI.settings.ROUND_PIXELS = false;
 
 // Initialize Core Registries

@@ -1,7 +1,6 @@
 // ============================================================
 // DEVELOPER CONSOLE & LIVE DEBUGGING SUITE (ES Module)
-// Active when URL has /?dev query parameter
-// Features: Real-time Stats, Direct File Persistence, Round-Robin Balancing Test
+// Scalable to 20+ Minits, Multi-Texture File Importer, Minit File Importer
 // ============================================================
 import { MinitEngine } from '../engine/Registry.js';
 import { HeadlessSimulator } from './HeadlessSimulator.js';
@@ -15,11 +14,11 @@ export class DevConsole {
 
     console.log('🛠️ Booting Developer Mode (/?dev)...');
 
-    // Snapshot original pristine minit registry on boot
     this.app = app;
     this.originalSnapshot = JSON.parse(JSON.stringify(MinitEngine.Registry.minits));
     this.activeMinitId = Object.keys(MinitEngine.Registry.minits)[0] || 'laser';
-    this.activeTab = 'editor'; // 'editor' | 'balance' | 'telemetry'
+    this.activeTab = 'editor'; // 'editor' | 'import' | 'balance' | 'telemetry'
+    this.searchFilter = '';
     this.fps = 60;
     this.frameCount = 0;
     this.lastFpsUpdate = performance.now();
@@ -58,6 +57,7 @@ export class DevConsole {
       </div>
       <div class="dev-nav-tabs">
         <button class="dev-tab-btn active" data-tab="editor">MINIT EDITOR</button>
+        <button class="dev-tab-btn" data-tab="import">IMPORT MINIT</button>
         <button class="dev-tab-btn" data-tab="balance">BALANCE TEST</button>
         <button class="dev-tab-btn" data-tab="telemetry">TELEMETRY</button>
       </div>
@@ -110,7 +110,7 @@ export class DevConsole {
     toast.style.color = isError ? '#ff8899' : '#55ffaa';
     setTimeout(() => {
       toast.style.display = 'none';
-    }, 3500);
+    }, 4000);
   }
 
   static _render() {
@@ -119,6 +119,8 @@ export class DevConsole {
 
     if (this.activeTab === 'editor') {
       this._renderEditorTab(container);
+    } else if (this.activeTab === 'import') {
+      this._renderImportTab(container);
     } else if (this.activeTab === 'balance') {
       this._renderBalanceTab(container);
     } else {
@@ -127,24 +129,38 @@ export class DevConsole {
   }
 
   // ------------------------------------------------------------
-  // TAB 1: MINIT STATS & DIRECT FILE PERSISTENCE
+  // TAB 1: MINIT STATS, MULTI-TEXTURE & DIRECT FILE PERSISTENCE
+  // Scalable to 10-20+ Minits with Search Filter
   // ------------------------------------------------------------
   static _renderEditorTab(container) {
     const minits = MinitEngine.Registry.minits;
+    const allIds = Object.keys(minits);
+    const filteredIds = allIds.filter((id) =>
+      id.toLowerCase().includes(this.searchFilter.toLowerCase()) ||
+      minits[id].name.toLowerCase().includes(this.searchFilter.toLowerCase())
+    );
+
+    if (!minits[this.activeMinitId] && allIds.length > 0) {
+      this.activeMinitId = allIds[0];
+    }
     const current = minits[this.activeMinitId];
     if (!current) return;
 
     const payload = current.payload || {};
     const action = current.action || {};
     const stats = current.stats || {};
-    const baseTex = current.textures?.base || '';
+    const textures = current.textures || {};
 
-    // Damage field detection
     let dmgValue = payload.dmg || payload.missileDmg || payload.beamTickDmg || 20;
 
     container.innerHTML = `
-      <div class="dev-minit-pills">
-        ${Object.keys(minits)
+      <!-- Scalable Minit Search & Scrollable Selector -->
+      <div class="dev-search-bar">
+        <input type="text" class="dev-search-input" id="dev-search-minit" placeholder="🔍 Search among ${allIds.length} minits..." value="${this.searchFilter}">
+      </div>
+
+      <div class="dev-minit-scroll-wrap">
+        ${filteredIds
           .map(
             (id) => `
           <button class="dev-minit-pill ${id === this.activeMinitId ? 'active' : ''}" data-id="${id}">
@@ -155,6 +171,7 @@ export class DevConsole {
           .join('')}
       </div>
 
+      <!-- Core Stats -->
       <div class="dev-field-group">
         <div class="dev-field-label"><span>Max HP</span><span class="dev-field-value" id="val-hp">${stats.hp}</span></div>
         <input type="range" class="dev-input-range" id="input-hp" min="500" max="3000" step="25" value="${stats.hp}">
@@ -175,9 +192,25 @@ export class DevConsole {
         <input type="range" class="dev-input-range" id="input-dmg" min="2" max="150" step="1" value="${dmgValue}">
       </div>
 
-      <div class="dev-field-group">
-        <div class="dev-field-label"><span>Base Texture Path (PNG/SVG)</span></div>
-        <input type="text" class="dev-input-text" id="input-tex" value="${baseTex}">
+      <!-- Multi-Texture Manager with File Importer -->
+      <div style="margin-top:14px;border-top:1px solid #242436;padding-top:10px;">
+        <div class="dev-field-label" style="font-weight:bold;color:#00e5ff;">TEXTURES (${Object.keys(textures).length})</div>
+        <div id="dev-textures-list">
+          ${Object.keys(textures)
+            .map(
+              (tKey) => `
+            <div class="dev-tex-row" data-key="${tKey}">
+              <span class="dev-tex-badge">${tKey}</span>
+              <input type="text" class="dev-input-text dev-tex-path-input" data-key="${tKey}" value="${textures[tKey]}" style="flex:1;">
+              <label class="dev-file-btn">
+                📁 IMPORT
+                <input type="file" class="dev-tex-file-picker" data-key="${tKey}" accept="image/png,image/svg+xml,image/jpeg" style="display:none;">
+              </label>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
       </div>
 
       <div class="dev-btn-row">
@@ -186,7 +219,34 @@ export class DevConsole {
       </div>
     `;
 
-    // Minit switcher
+    // Search filter listener
+    const searchInput = container.querySelector('#dev-search-minit');
+    searchInput.oninput = (e) => {
+      this.searchFilter = e.target.value;
+      const scrollWrap = container.querySelector('.dev-minit-scroll-wrap');
+      const matches = allIds.filter((id) =>
+        id.toLowerCase().includes(this.searchFilter.toLowerCase()) ||
+        minits[id].name.toLowerCase().includes(this.searchFilter.toLowerCase())
+      );
+      scrollWrap.innerHTML = matches
+        .map(
+          (id) => `
+        <button class="dev-minit-pill ${id === this.activeMinitId ? 'active' : ''}" data-id="${id}">
+          <span style="color:#${minits[id].color.toString(16).padStart(6, '0')}">●</span> ${minits[id].name}
+        </button>
+      `
+        )
+        .join('');
+
+      scrollWrap.querySelectorAll('.dev-minit-pill').forEach((btn) => {
+        btn.onclick = () => {
+          this.activeMinitId = btn.getAttribute('data-id');
+          this._render();
+        };
+      });
+    };
+
+    // Minit pill switcher
     container.querySelectorAll('.dev-minit-pill').forEach((btn) => {
       btn.onclick = () => {
         this.activeMinitId = btn.getAttribute('data-id');
@@ -194,27 +254,20 @@ export class DevConsole {
       };
     });
 
-    // Reactive input listeners (Live In-Memory Mutation)
-    const inpHp = container.querySelector('#input-hp');
-    inpHp.oninput = (e) => {
+    // Reactive input listeners
+    container.querySelector('#input-hp').oninput = (e) => {
       stats.hp = Number(e.target.value);
       container.querySelector('#val-hp').innerText = stats.hp;
     };
-
-    const inpSpeed = container.querySelector('#input-speed');
-    inpSpeed.oninput = (e) => {
+    container.querySelector('#input-speed').oninput = (e) => {
       stats.speed = Number(e.target.value);
       container.querySelector('#val-speed').innerText = stats.speed;
     };
-
-    const inpCd = container.querySelector('#input-cd');
-    inpCd.oninput = (e) => {
+    container.querySelector('#input-cd').oninput = (e) => {
       action.cd = Number(e.target.value);
       container.querySelector('#val-cd').innerText = action.cd;
     };
-
-    const inpDmg = container.querySelector('#input-dmg');
-    inpDmg.oninput = (e) => {
+    container.querySelector('#input-dmg').oninput = (e) => {
       const val = Number(e.target.value);
       if (payload.dmg !== undefined) payload.dmg = val;
       if (payload.missileDmg !== undefined) payload.missileDmg = val;
@@ -222,21 +275,58 @@ export class DevConsole {
       container.querySelector('#val-dmg').innerText = val;
     };
 
-    const inpTex = container.querySelector('#input-tex');
-    inpTex.onchange = (e) => {
-      const newPath = e.target.value.trim();
-      if (current.textures) current.textures.base = newPath;
-      if (Textures[`minit_${current.id}_base`]) {
-        try {
-          const newTex = PIXI.Texture.from(newPath);
-          newTex.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
-          newTex.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
-          Textures[`minit_${current.id}_base`] = newTex;
-        } catch (err) {
-          console.warn('Failed to hot-swap texture', err);
-        }
-      }
-    };
+    // Texture path text edit
+    container.querySelectorAll('.dev-tex-path-input').forEach((inp) => {
+      inp.onchange = (e) => {
+        const tKey = inp.getAttribute('data-key');
+        const newPath = e.target.value.trim();
+        textures[tKey] = newPath;
+        this._hotSwapTexture(current.id, tKey, newPath);
+      };
+    });
+
+    // Texture external file import & upload
+    container.querySelectorAll('.dev-tex-file-picker').forEach((fileInput) => {
+      fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const tKey = fileInput.getAttribute('data-key');
+        const reader = new FileReader();
+
+        reader.onload = async (ev) => {
+          const dataBase64 = ev.target.result;
+
+          // 1. Instant live WebGL hot-swap using data URL
+          this._hotSwapTexture(current.id, tKey, dataBase64);
+
+          // 2. Upload file to public/assets/minit_icon via Vite server API
+          try {
+            const res = await fetch('/api/dev/upload-asset', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                filename: file.name,
+                dataBase64
+              })
+            });
+            const data = await res.json();
+            if (data.success) {
+              textures[tKey] = data.path;
+              const pathInput = container.querySelector(`.dev-tex-path-input[data-key="${tKey}"]`);
+              if (pathInput) pathInput.value = data.path;
+              this._showToast(`✓ Loaded & saved ${file.name} to project assets!`);
+            } else {
+              this._showToast(`✗ Upload error: ${data.error}`, true);
+            }
+          } catch (err) {
+            this._showToast(`✗ Server upload failed`, true);
+          }
+        };
+
+        reader.readAsDataURL(file);
+      };
+    });
 
     // Save Directly to File (POST /api/dev/save-minit)
     container.querySelector('#btn-save-disk').onclick = async () => {
@@ -249,9 +339,9 @@ export class DevConsole {
           body: JSON.stringify({
             id: current.id,
             stats: { hp: stats.hp, speed: stats.speed },
-            payload: payload,
+            payload,
             actionCd: action.cd,
-            baseTexture: inpTex.value.trim()
+            textures
           })
         });
         const result = await res.json();
@@ -275,15 +365,156 @@ export class DevConsole {
         stats.speed = orig.stats.speed;
         if (action.cd && orig.action) action.cd = orig.action.cd;
         if (payload && orig.payload) Object.assign(payload, orig.payload);
-        if (current.textures && orig.textures) current.textures.base = orig.textures.base;
+        if (current.textures && orig.textures) Object.assign(current.textures, orig.textures);
         this._showToast(`↺ Reset ${current.name} to code defaults`);
         this._render();
       }
     };
   }
 
+  static _hotSwapTexture(minitId, textureKey, sourceUrl) {
+    const regKey = `minit_${minitId}_${textureKey}`;
+    try {
+      const tex = PIXI.Texture.from(sourceUrl);
+      if (tex?.baseTexture) {
+        tex.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+        tex.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
+        tex.baseTexture.mipmap = PIXI.MIPMAP_MODES.OFF;
+      }
+      Textures[regKey] = tex;
+    } catch (err) {
+      console.warn('Hot swap texture failed', err);
+    }
+  }
+
   // ------------------------------------------------------------
-  // TAB 2: HEADLESS ROUND-ROBIN BALANCING TEST
+  // TAB 2: IMPORT MINIT FILE (.JS / .TS) & SAVE DIRECTLY TO PROJECT
+  // ------------------------------------------------------------
+  static _renderImportTab(container) {
+    container.innerHTML = `
+      <div style="font-size:11px;color:#aaa;margin-bottom:12px;line-height:1.5;">
+        Upload or paste a <code>minit &lt;id&gt;.js</code> or <code>.ts</code> file to instantly load it into the engine and persist it directly to project files.
+      </div>
+
+      <div class="dev-dropzone" id="dev-minit-dropzone">
+        <div style="font-size:24px;margin-bottom:6px;">📄</div>
+        <div style="font-size:11px;font-weight:bold;color:#00e5ff;">CLICK TO BROWSE OR DROP MINIT FILE (.js / .ts)</div>
+        <div style="font-size:10px;color:#888;margin-top:4px;">Supported: MINIT_&lt;NAME&gt; object definitions</div>
+        <input type="file" id="dev-minit-file-input" accept=".js,.ts" style="display:none;">
+      </div>
+
+      <div class="dev-field-group">
+        <div class="dev-field-label"><span>Minit File Name</span></div>
+        <input type="text" class="dev-input-text" id="dev-import-filename" placeholder="e.g. striker.js" value="">
+      </div>
+
+      <div class="dev-field-group">
+        <div class="dev-field-label"><span>Minit Code Preview</span></div>
+        <textarea class="dev-code-editor" id="dev-import-code" placeholder="// Paste or inspect imported minit code here..."></textarea>
+      </div>
+
+      <div class="dev-btn-row">
+        <button class="dev-btn dev-btn-save" id="btn-save-minit-file">💾 SAVE TO PROJECT FILES</button>
+      </div>
+    `;
+
+    const dropzone = container.querySelector('#dev-minit-dropzone');
+    const fileInput = container.querySelector('#dev-minit-file-input');
+    const filenameInput = container.querySelector('#dev-import-filename');
+    const codeArea = container.querySelector('#dev-import-code');
+    const btnSave = container.querySelector('#btn-save-minit-file');
+
+    dropzone.onclick = () => fileInput.click();
+
+    // Drag and drop handlers
+    dropzone.ondragover = (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = '#00e5ff';
+    };
+    dropzone.ondragleave = () => {
+      dropzone.style.borderColor = '#33334e';
+    };
+    dropzone.ondrop = (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = '#33334e';
+      if (e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    };
+
+    fileInput.onchange = (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    };
+
+    const handleFile = (file) => {
+      filenameInput.value = file.name;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        codeArea.value = ev.target.result;
+        this._showToast(`Loaded ${file.name}`);
+      };
+      reader.readAsText(file);
+    };
+
+    // Save and register minit directly to project
+    btnSave.onclick = async () => {
+      const filename = filenameInput.value.trim();
+      const content = codeArea.value.trim();
+
+      if (!filename || !content) {
+        this._showToast('Please provide both filename and code', true);
+        return;
+      }
+
+      btnSave.innerText = 'SAVING TO PROJECT...';
+      try {
+        // Extract exported variable name
+        const match = content.match(/export\s+const\s+(MINIT_\w+)/);
+        const varName = match ? match[1] : null;
+
+        const res = await fetch('/api/dev/save-minit-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename,
+            content,
+            varName
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          this._showToast(data.message);
+
+          // Dynamically eval minit object in-memory for zero-reload playability
+          try {
+            const cleanCode = content
+              .replace(/import\s+[^;]+;/g, '')
+              .replace(/export\s+const\s+\w+\s*=/, 'return');
+            const evalFn = new Function(cleanCode);
+            const parsedMinit = evalFn();
+            if (parsedMinit && parsedMinit.id) {
+              MinitEngine.Registry.addMinit(parsedMinit);
+              this.activeMinitId = parsedMinit.id;
+            }
+          } catch (evalErr) {
+            console.log('Registered in project files (full reload will apply traits)');
+          }
+        } else {
+          this._showToast(`✗ ${data.error}`, true);
+        }
+      } catch (err) {
+        this._showToast(`✗ Failed to save minit to project`, true);
+      } finally {
+        btnSave.innerText = '💾 SAVE TO PROJECT FILES';
+      }
+    };
+  }
+
+  // ------------------------------------------------------------
+  // TAB 3: HEADLESS ROUND-ROBIN BALANCING TEST
   // ------------------------------------------------------------
   static _renderBalanceTab(container) {
     container.innerHTML = `
@@ -356,7 +587,6 @@ export class DevConsole {
       </div>
     `;
 
-    // Leaderboard Cards
     leaderboard.forEach((rec, idx) => {
       const tierClass = `dev-tier-${rec.tier.charAt(0)}`;
       html += `
@@ -376,7 +606,6 @@ export class DevConsole {
       `;
     });
 
-    // 7x7 Matchup Matrix Table
     html += `
       <div style="font-size:11px;font-weight:bold;color:#00e5ff;margin-top:16px;margin-bottom:6px;">
         📊 1V1 MATCHUP MATRIX (Row vs Col Win %)
@@ -418,7 +647,7 @@ export class DevConsole {
   }
 
   // ------------------------------------------------------------
-  // TAB 3: TELEMETRY & ENGINE STATS
+  // TAB 4: TELEMETRY & ENGINE STATS
   // ------------------------------------------------------------
   static _renderTelemetryTab(container) {
     const isLandscape = window.innerWidth >= window.innerHeight;
