@@ -22,7 +22,7 @@ function devMinitSaverPlugin(): Plugin {
         req.on('end', () => {
           try {
             const data = JSON.parse(body);
-            const { id, stats, payload, actionCd, textures } = data;
+            const { id, fullCode, stats, payload, actionCd, textures } = data;
             if (!id) throw new Error('Missing minit ID');
 
             const filePath = path.resolve(__dirname, `src/minits/${id}.js`);
@@ -31,6 +31,18 @@ function devMinitSaverPlugin(): Plugin {
               res.setHeader('Content-Type', 'application/json');
               return res.end(
                 JSON.stringify({ success: false, error: `File not found: src/minits/${id}.js` })
+              );
+            }
+
+            // If complete structured code is provided from DevConsole, write it directly!
+            if (fullCode && typeof fullCode === 'string' && fullCode.length > 50) {
+              fs.writeFileSync(filePath, fullCode, 'utf-8');
+              res.setHeader('Content-Type', 'application/json');
+              return res.end(
+                JSON.stringify({
+                  success: true,
+                  message: `Directly updated src/minits/${id}.js on disk!`
+                })
               );
             }
 

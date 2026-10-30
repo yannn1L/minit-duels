@@ -1,5 +1,5 @@
 // ============================================================
-// MINIT: ABSORB (ES Module)
+// MINIT: ABSORB (ES Module - Balanced & Fair Control Minit)
 // ============================================================
 import { CFG } from '../config.js';
 import { FastMath } from '../engine/FastMath.js';
@@ -8,40 +8,40 @@ export const MINIT_ABSORB = {
   id: 'absorb',
   name: 'ABSORB',
   color: 0xff4422,
-  desc: 'Grow in size and power.',
-  stats: { hp: 1300, speed: 0.1 },
+  desc: 'Creates a gravity vortex. Drains HP and grows in size & power.',
+  stats: { hp: 1250, speed: 0.1 },
   targeting: { type: 'closest_enemy' },
 
   deathVfx: {
     shake: 10,
     flash: 0.6,
     particleCount: 30,
-    shockRad: 150,
+    shockRad: 140,
     sound: 'explosion',
     hitStop: 12
   },
 
   payload: {
-    zoneRadius: 3.0,
+    zoneRadius: 2.3,       // Balanced radius (allows enemies with good movement to evade)
     zoneDuration: 180,
-    tickRate: 10,
+    tickRate: 15,          // 4 ticks per second
     drain: {
-      speed: 0.8,
-      hp: 5,
+      speed: 0.25,         // Gentle gravitational pull instead of paralyzing stun
+      hp: 3.5,             // Fair drain damage per tick
       vfxLeech: 'fx_absorb_energy',
-      hitVfx: { flash: 0.1, particleCount: 3, shake: 0, playSound: false }
+      hitVfx: { flash: 0.08, particleCount: 2, shake: 0, playSound: false }
     },
     buff: {
-      scale: 0.015,
-      maxScale: 3.5,
-      dmgMult: 0.08,
-      maxDmgMult: 8.0,
+      scale: 0.008,
+      maxScale: 1.8,       // Balanced visual growth
+      dmgMult: 0.02,
+      maxDmgMult: 2.0,     // Capped at 2.0x max multiplier (instead of 8x)
       sound: 'absorb_ding'
     }
   },
 
   action: {
-    cd: 240,
+    cd: 220,
     count: 1,
     speed: 0,
     life: 1,
@@ -55,7 +55,7 @@ export const MINIT_ABSORB = {
 
   customTextures: {
     fx_absorb_ring: (g) => {
-      g.lineStyle(2, 0xff4422, 0.5).drawCircle(0, 0, 48);
+      g.lineStyle(2, 0xff4422, 0.5).drawCircle(0, 0, 36);
     },
     fx_absorb_dust: (g) => g.beginFill(0xff4422).drawRect(-1, -1, 2, 2).endFill(),
     fx_absorb_energy: (g) => g.beginFill(0xffaa00).drawRect(-1, -1, 3, 3).endFill()
@@ -99,11 +99,11 @@ export const MINIT_ABSORB = {
             startY,
             Math.cos(ang + Math.PI) * speed,
             Math.sin(ang + Math.PI) * speed,
-            15,
-            1,
-            1,
+            12,
+            0.9,
+            0.9,
             true,
-            0xffffff
+            0xff4422
           );
         }
       }

@@ -130,7 +130,7 @@ export class DevConsole {
 
   // ------------------------------------------------------------
   // TAB 1: MINIT STATS, MULTI-TEXTURE & DIRECT FILE PERSISTENCE
-  // Scalable to 10-20+ Minits with Search Filter
+  // Tailored controls for each minit (prevents stat corruption)
   // ------------------------------------------------------------
   static _renderEditorTab(container) {
     const minits = MinitEngine.Registry.minits;
@@ -151,7 +151,116 @@ export class DevConsole {
     const stats = current.stats || {};
     const textures = current.textures || {};
 
-    let dmgValue = payload.dmg || payload.missileDmg || payload.beamTickDmg || 20;
+    // Dynamic tailored controls per minit
+    let specificControlsHtml = '';
+
+    if (current.id === 'moth') {
+      const transAction = payload.transformation?.action || {};
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Egg Hatch Incubation (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="120" max="600" step="10" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Hatched Spore Attack (CD)</span><span class="dev-field-value" id="val-moth-atk-cd">${transAction.cd || 75}</span></div>
+          <input type="range" class="dev-input-range" id="input-moth-atk-cd" min="30" max="180" step="5" value="${transAction.cd || 75}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Spore Bomb Damage</span><span class="dev-field-value" id="val-dmg">${payload.dmg || 48}</span></div>
+          <input type="range" class="dev-input-range" id="input-dmg" min="10" max="120" step="2" value="${payload.dmg || 48}">
+        </div>
+      `;
+    } else if (current.id === 'absorb') {
+      const drain = payload.drain || {};
+      const buff = payload.buff || {};
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Vortex Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="100" max="400" step="10" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Drain HP per Tick</span><span class="dev-field-value" id="val-absorb-hp">${drain.hp || 3.5}</span></div>
+          <input type="range" class="dev-input-range" id="input-absorb-hp" min="1" max="10" step="0.5" value="${drain.hp || 3.5}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Vortex Pull Strength</span><span class="dev-field-value" id="val-absorb-speed">${drain.speed || 0.25}</span></div>
+          <input type="range" class="dev-input-range" id="input-absorb-speed" min="0.05" max="0.6" step="0.05" value="${drain.speed || 0.25}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Max Growth Multiplier</span><span class="dev-field-value" id="val-absorb-maxmult">${buff.maxDmgMult || 2.0}x</span></div>
+          <input type="range" class="dev-input-range" id="input-absorb-maxmult" min="1.2" max="4.0" step="0.1" value="${buff.maxDmgMult || 2.0}">
+        </div>
+      `;
+    } else if (current.id === 'ironmen') {
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Ability Cycle Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="60" max="240" step="5" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>4x Homing Missile Damage</span><span class="dev-field-value" id="val-iron-missile">${payload.missileDmg || 32}</span></div>
+          <input type="range" class="dev-input-range" id="input-iron-missile" min="10" max="60" step="1" value="${payload.missileDmg || 32}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Thruster Ram Slam Damage</span><span class="dev-field-value" id="val-iron-ram">${payload.ramDmg || 65}</span></div>
+          <input type="range" class="dev-input-range" id="input-iron-ram" min="20" max="120" step="2" value="${payload.ramDmg || 65}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Unibeam Laser Tick Damage</span><span class="dev-field-value" id="val-iron-beam">${payload.beamTickDmg || 13}</span></div>
+          <input type="range" class="dev-input-range" id="input-iron-beam" min="4" max="30" step="1" value="${payload.beamTickDmg || 13}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Ram Knockback Force</span><span class="dev-field-value" id="val-iron-kb">${payload.knockbackForce || 1.25}</span></div>
+          <input type="range" class="dev-input-range" id="input-iron-kb" min="0.5" max="2.5" step="0.05" value="${payload.knockbackForce || 1.25}">
+        </div>
+      `;
+    } else if (current.id === 'laser') {
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Laser Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="100" max="400" step="10" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Beam Base Tick Damage</span><span class="dev-field-value" id="val-dmg">${payload.baseDmg || 6}</span></div>
+          <input type="range" class="dev-input-range" id="input-dmg" min="2" max="20" step="1" value="${payload.baseDmg || 6}">
+        </div>
+      `;
+    } else if (current.id === 'pulsar') {
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Deploy Drone Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="80" max="360" step="10" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>360° Bullet Damage</span><span class="dev-field-value" id="val-dmg">${payload.bulletDmg || 12}</span></div>
+          <input type="range" class="dev-input-range" id="input-dmg" min="4" max="40" step="1" value="${payload.bulletDmg || 12}">
+        </div>
+      `;
+    } else if (current.id === 'waves') {
+      const debuffPay = payload.debuff?.payload || {};
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Shockwave Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="100" max="400" step="10" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Paralysis Tick Damage</span><span class="dev-field-value" id="val-dmg">${debuffPay.dmg || 20}</span></div>
+          <input type="range" class="dev-input-range" id="input-dmg" min="5" max="50" step="1" value="${debuffPay.dmg || 20}">
+        </div>
+      `;
+    } else {
+      // Gojo / Generic
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Ability Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd || 180}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="60" max="400" step="10" value="${action.cd || 180}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Attack Damage</span><span class="dev-field-value" id="val-dmg">${payload.dmg || 25}</span></div>
+          <input type="range" class="dev-input-range" id="input-dmg" min="5" max="80" step="1" value="${payload.dmg || 25}">
+        </div>
+      `;
+    }
 
     container.innerHTML = `
       <!-- Scalable Minit Search & Scrollable Selector -->
@@ -179,18 +288,11 @@ export class DevConsole {
 
       <div class="dev-field-group">
         <div class="dev-field-label"><span>Movement Speed</span><span class="dev-field-value" id="val-speed">${stats.speed}</span></div>
-        <input type="range" class="dev-input-range" id="input-speed" min="0.02" max="0.35" step="0.01" value="${stats.speed}">
+        <input type="range" class="dev-input-range" id="input-speed" min="0.0" max="0.35" step="0.01" value="${stats.speed}">
       </div>
 
-      <div class="dev-field-group">
-        <div class="dev-field-label"><span>Action Cooldown (Frames)</span><span class="dev-field-value" id="val-cd">${action.cd || 120}</span></div>
-        <input type="range" class="dev-input-range" id="input-cd" min="40" max="400" step="5" value="${action.cd || 120}">
-      </div>
-
-      <div class="dev-field-group">
-        <div class="dev-field-label"><span>Primary Attack Damage</span><span class="dev-field-value" id="val-dmg">${dmgValue}</span></div>
-        <input type="range" class="dev-input-range" id="input-dmg" min="2" max="150" step="1" value="${dmgValue}">
-      </div>
+      <!-- Tailored Minit-Specific Controls -->
+      ${specificControlsHtml}
 
       <!-- Multi-Texture Manager with File Importer -->
       <div style="margin-top:14px;border-top:1px solid #242436;padding-top:10px;">
@@ -218,6 +320,10 @@ export class DevConsole {
         <button class="dev-btn" id="btn-copy-code">📋 COPY CODE</button>
         <button class="dev-btn" id="btn-download-file">📥 DOWNLOAD</button>
         <button class="dev-btn" id="btn-reset-memory">↺ RESET</button>
+      </div>
+
+      <div style="margin-top:10px;font-size:10px;color:#8888aa;line-height:1.4;">
+        💡 Changes apply in-game immediately! Click <b>SAVE TO FILE</b> to save on disk, or <b>COPY CODE</b> to paste directly to GitHub.
       </div>
     `;
 
@@ -256,26 +362,144 @@ export class DevConsole {
       };
     });
 
-    // Reactive input listeners
-    container.querySelector('#input-hp').oninput = (e) => {
-      stats.hp = Number(e.target.value);
-      container.querySelector('#val-hp').innerText = stats.hp;
-    };
-    container.querySelector('#input-speed').oninput = (e) => {
-      stats.speed = Number(e.target.value);
-      container.querySelector('#val-speed').innerText = stats.speed;
-    };
-    container.querySelector('#input-cd').oninput = (e) => {
-      action.cd = Number(e.target.value);
-      container.querySelector('#val-cd').innerText = action.cd;
-    };
-    container.querySelector('#input-dmg').oninput = (e) => {
-      const val = Number(e.target.value);
-      if (payload.dmg !== undefined) payload.dmg = val;
-      if (payload.missileDmg !== undefined) payload.missileDmg = val;
-      if (payload.beamTickDmg !== undefined) payload.beamTickDmg = val;
-      container.querySelector('#val-dmg').innerText = val;
-    };
+    // Reactive input listeners for core stats
+    const inpHp = container.querySelector('#input-hp');
+    if (inpHp) {
+      inpHp.oninput = (e) => {
+        stats.hp = Number(e.target.value);
+        container.querySelector('#val-hp').innerText = stats.hp;
+      };
+    }
+
+    const inpSpeed = container.querySelector('#input-speed');
+    if (inpSpeed) {
+      inpSpeed.oninput = (e) => {
+        stats.speed = Number(e.target.value);
+        container.querySelector('#val-speed').innerText = stats.speed;
+      };
+    }
+
+    const inpCd = container.querySelector('#input-cd');
+    if (inpCd) {
+      inpCd.oninput = (e) => {
+        action.cd = Number(e.target.value);
+        container.querySelector('#val-cd').innerText = action.cd;
+      };
+    }
+
+    // Specific listeners
+    if (current.id === 'moth') {
+      const inpHatchAtk = container.querySelector('#input-moth-atk-cd');
+      if (inpHatchAtk && payload.transformation?.action) {
+        inpHatchAtk.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.transformation.action.cd = v;
+          container.querySelector('#val-moth-atk-cd').innerText = v;
+        };
+      }
+      const inpDmg = container.querySelector('#input-dmg');
+      if (inpDmg) {
+        inpDmg.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.dmg = v;
+          container.querySelector('#val-dmg').innerText = v;
+        };
+      }
+    } else if (current.id === 'absorb') {
+      const inpHp = container.querySelector('#input-absorb-hp');
+      if (inpHp && payload.drain) {
+        inpHp.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.drain.hp = v;
+          container.querySelector('#val-absorb-hp').innerText = v;
+        };
+      }
+      const inpSpd = container.querySelector('#input-absorb-speed');
+      if (inpSpd && payload.drain) {
+        inpSpd.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.drain.speed = v;
+          container.querySelector('#val-absorb-speed').innerText = v;
+        };
+      }
+      const inpMax = container.querySelector('#input-absorb-maxmult');
+      if (inpMax && payload.buff) {
+        inpMax.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.buff.maxDmgMult = v;
+          container.querySelector('#val-absorb-maxmult').innerText = `${v}x`;
+        };
+      }
+    } else if (current.id === 'ironmen') {
+      const inpMis = container.querySelector('#input-iron-missile');
+      if (inpMis) {
+        inpMis.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.missileDmg = v;
+          container.querySelector('#val-iron-missile').innerText = v;
+        };
+      }
+      const inpRam = container.querySelector('#input-iron-ram');
+      if (inpRam) {
+        inpRam.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.ramDmg = v;
+          container.querySelector('#val-iron-ram').innerText = v;
+        };
+      }
+      const inpBm = container.querySelector('#input-iron-beam');
+      if (inpBm) {
+        inpBm.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.beamTickDmg = v;
+          container.querySelector('#val-iron-beam').innerText = v;
+        };
+      }
+      const inpKb = container.querySelector('#input-iron-kb');
+      if (inpKb) {
+        inpKb.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.knockbackForce = v;
+          container.querySelector('#val-iron-kb').innerText = v;
+        };
+      }
+    } else if (current.id === 'laser') {
+      const inpDmg = container.querySelector('#input-dmg');
+      if (inpDmg) {
+        inpDmg.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.baseDmg = v;
+          container.querySelector('#val-dmg').innerText = v;
+        };
+      }
+    } else if (current.id === 'pulsar') {
+      const inpDmg = container.querySelector('#input-dmg');
+      if (inpDmg) {
+        inpDmg.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.bulletDmg = v;
+          container.querySelector('#val-dmg').innerText = v;
+        };
+      }
+    } else if (current.id === 'waves') {
+      const inpDmg = container.querySelector('#input-dmg');
+      if (inpDmg && payload.debuff?.payload) {
+        inpDmg.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.debuff.payload.dmg = v;
+          container.querySelector('#val-dmg').innerText = v;
+        };
+      }
+    } else {
+      const inpDmg = container.querySelector('#input-dmg');
+      if (inpDmg) {
+        inpDmg.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.dmg = v;
+          container.querySelector('#val-dmg').innerText = v;
+        };
+      }
+    }
 
     // Texture path text edit
     container.querySelectorAll('.dev-tex-path-input').forEach((inp) => {
@@ -299,10 +523,10 @@ export class DevConsole {
         reader.onload = async (ev) => {
           const dataBase64 = ev.target.result;
 
-          // 1. Instant live WebGL hot-swap using data URL
+          // 1. Live WebGL hot-swap
           this._hotSwapTexture(current.id, tKey, dataBase64);
 
-          // 2. Upload file to public/assets/minit_icon via Vite server API
+          // 2. Upload file to public/assets/minit_icon
           try {
             const res = await fetch('/api/dev/upload-asset', {
               method: 'POST',
@@ -330,16 +554,18 @@ export class DevConsole {
       };
     });
 
-    // Save Directly to File (POST /api/dev/save-minit)
+    // Save Directly to File (POST /api/dev/save-minit) with fullCode
     container.querySelector('#btn-save-disk').onclick = async () => {
       const saveBtn = container.querySelector('#btn-save-disk');
       saveBtn.innerText = 'SAVING TO FILE...';
       try {
+        const fullCode = await DevConsole._generateMinitCode(current, stats, payload, action, textures);
         const res = await fetch('/api/dev/save-minit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: current.id,
+            fullCode,
             stats: { hp: stats.hp, speed: stats.speed },
             payload,
             actionCd: action.cd,
@@ -355,7 +581,7 @@ export class DevConsole {
       } catch (err) {
         this._showToast(`✗ Failed to reach save endpoint`, true);
       } finally {
-        saveBtn.innerText = '💾 SAVE TO FILE DIRECTLY';
+        saveBtn.innerText = '💾 SAVE TO FILE';
       }
     };
 
@@ -366,7 +592,6 @@ export class DevConsole {
         await navigator.clipboard.writeText(code);
         this._showToast(`✓ Copied src/minits/${current.id}.js to clipboard!`);
       } catch (e) {
-        // Fallback for iframe restrictions
         const ta = document.createElement('textarea');
         ta.value = code;
         document.body.appendChild(ta);
@@ -399,7 +624,7 @@ export class DevConsole {
         stats.hp = orig.stats.hp;
         stats.speed = orig.stats.speed;
         if (action.cd && orig.action) action.cd = orig.action.cd;
-        if (payload && orig.payload) Object.assign(payload, orig.payload);
+        if (payload && orig.payload) Object.assign(payload, JSON.parse(JSON.stringify(orig.payload)));
         if (current.textures && orig.textures) Object.assign(current.textures, orig.textures);
         this._showToast(`↺ Reset ${current.name} to code defaults`);
         this._render();
@@ -415,13 +640,78 @@ export class DevConsole {
     } catch (e) {}
 
     if (baseCode) {
-      if (stats.hp !== undefined) baseCode = baseCode.replace(/(hp:\s*)\d+(\.\d+)?/g, `$1${stats.hp}`);
-      if (stats.speed !== undefined) baseCode = baseCode.replace(/(speed:\s*)\d+(\.\d+)?/g, `$1${stats.speed}`);
-      if (action.cd !== undefined) baseCode = baseCode.replace(/(cd:\s*)\d+/g, `$1${action.cd}`);
-      if (payload.dmg !== undefined) baseCode = baseCode.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.dmg}`);
-      if (payload.missileDmg !== undefined) baseCode = baseCode.replace(/(missileDmg:\s*)\d+(\.\d+)?/g, `$1${payload.missileDmg}`);
-      if (payload.ramDmg !== undefined) baseCode = baseCode.replace(/(ramDmg:\s*)\d+(\.\d+)?/g, `$1${payload.ramDmg}`);
-      if (payload.beamTickDmg !== undefined) baseCode = baseCode.replace(/(beamTickDmg:\s*)\d+(\.\d+)?/g, `$1${payload.beamTickDmg}`);
+      if (stats.hp !== undefined) {
+        baseCode = baseCode.replace(/(hp:\s*)\d+(\.\d+)?/g, `$1${stats.hp}`);
+      }
+      if (stats.speed !== undefined) {
+        baseCode = baseCode.replace(/(speed:\s*)\d+(\.\d+)?/g, `$1${stats.speed}`);
+      }
+      if (action.cd !== undefined) {
+        if (current.id === 'moth') {
+          // Replace only the first action cd (incubation hatch)
+          baseCode = baseCode.replace(/(action:\s*\{\s*cd:\s*)\d+/g, `$1${action.cd}`);
+        } else {
+          baseCode = baseCode.replace(/(cd:\s*)\d+/g, `$1${action.cd}`);
+        }
+      }
+
+      // Per-minit precise replacements
+      if (current.id === 'moth') {
+        const transCd = payload.transformation?.action?.cd;
+        if (transCd !== undefined) {
+          baseCode = baseCode.replace(
+            /(transformation:\s*\{[\s\S]*?action:\s*\{\s*cd:\s*)\d+/g,
+            `$1${transCd}`
+          );
+        }
+        if (payload.dmg !== undefined) {
+          baseCode = baseCode.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.dmg}`);
+        }
+      } else if (current.id === 'absorb') {
+        if (payload.drain?.hp !== undefined) {
+          baseCode = baseCode.replace(/(hp:\s*)\d+(\.\d+)?/g, (match, p1, offset, string) => {
+            if (string.slice(offset - 40, offset).includes('drain')) return `${p1}${payload.drain.hp}`;
+            return match;
+          });
+        }
+        if (payload.drain?.speed !== undefined) {
+          baseCode = baseCode.replace(/(speed:\s*)\d+(\.\d+)?/g, (match, p1, offset, string) => {
+            if (string.slice(offset - 40, offset).includes('drain')) return `${p1}${payload.drain.speed}`;
+            return match;
+          });
+        }
+        if (payload.buff?.maxDmgMult !== undefined) {
+          baseCode = baseCode.replace(/(maxDmgMult:\s*)\d+(\.\d+)?/g, `$1${payload.buff.maxDmgMult}`);
+        }
+      } else if (current.id === 'ironmen') {
+        if (payload.missileDmg !== undefined) {
+          baseCode = baseCode.replace(/(missileDmg:\s*)\d+(\.\d+)?/g, `$1${payload.missileDmg}`);
+        }
+        if (payload.ramDmg !== undefined) {
+          baseCode = baseCode.replace(/(ramDmg:\s*)\d+(\.\d+)?/g, `$1${payload.ramDmg}`);
+        }
+        if (payload.beamTickDmg !== undefined) {
+          baseCode = baseCode.replace(/(beamTickDmg:\s*)\d+(\.\d+)?/g, `$1${payload.beamTickDmg}`);
+        }
+        if (payload.knockbackForce !== undefined) {
+          baseCode = baseCode.replace(/(knockbackForce:\s*)\d+(\.\d+)?/g, `$1${payload.knockbackForce}`);
+        }
+      } else if (current.id === 'laser') {
+        if (payload.baseDmg !== undefined) {
+          baseCode = baseCode.replace(/(baseDmg:\s*)\d+(\.\d+)?/g, `$1${payload.baseDmg}`);
+        }
+      } else if (current.id === 'pulsar') {
+        if (payload.bulletDmg !== undefined) {
+          baseCode = baseCode.replace(/(bulletDmg:\s*)\d+(\.\d+)?/g, `$1${payload.bulletDmg}`);
+        }
+      } else if (current.id === 'waves') {
+        if (payload.debuff?.payload?.dmg !== undefined) {
+          baseCode = baseCode.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.debuff.payload.dmg}`);
+        }
+      } else if (payload.dmg !== undefined) {
+        baseCode = baseCode.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.dmg}`);
+      }
+
       if (textures) {
         for (const [tKey, tPath] of Object.entries(textures)) {
           const reg = new RegExp(`(${tKey}:\\s*['"])[^'"]+(['"])`, 'g');
