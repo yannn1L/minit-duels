@@ -1,0 +1,300 @@
+/* ============================================================
+   DEVELOPER CONSOLE STYLES (/?dev)
+   ============================================================ */
+
+#dev-dock-badge {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 10000;
+  background: rgba(11, 11, 20, 0.92);
+  border: 1px solid #00e5ff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: #00e5ff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+#dev-dock-badge:hover {
+  background: #121c2e;
+  border-color: #55ffff;
+}
+
+#dev-floating-panel {
+  position: fixed;
+  top: 48px;
+  right: 10px;
+  width: 440px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 65px);
+  background: rgba(11, 11, 20, 0.96);
+  border: 2px solid #242436;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  color: #e5e5f0;
+}
+
+.dev-header {
+  padding: 10px 14px;
+  background: #141422;
+  border-bottom: 1px solid #242436;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dev-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  color: #00e5ff;
+  letter-spacing: 1px;
+}
+
+.dev-close-btn {
+  background: none;
+  border: none;
+  color: #8888aa;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.dev-close-btn:hover {
+  color: #ff3355;
+}
+
+.dev-nav-tabs {
+  display: flex;
+  background: #0f0f1a;
+  border-bottom: 1px solid #242436;
+}
+
+.dev-tab-btn {
+  flex: 1;
+  padding: 8px 6px;
+  background: none;
+  border: none;
+  color: #8888aa;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.dev-tab-btn.active {
+  color: #00e5ff;
+  border-bottom-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.05);
+}
+
+.dev-content {
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* MINIT SELECTOR PILLS */
+.dev-minit-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.dev-minit-pill {
+  padding: 4px 8px;
+  background: #161626;
+  border: 1px solid #28283e;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #bbb;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dev-minit-pill.active {
+  border-color: #00e5ff;
+  color: #fff;
+  background: #1b263b;
+  font-weight: bold;
+}
+
+/* FIELD GROUPS */
+.dev-field-group {
+  margin-bottom: 12px;
+}
+
+.dev-field-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #9999bb;
+  margin-bottom: 4px;
+}
+
+.dev-field-value {
+  color: #00e5ff;
+  font-family: monospace;
+}
+
+.dev-input-range {
+  width: 100%;
+  accent-color: #00e5ff;
+  cursor: pointer;
+}
+
+.dev-input-text {
+  width: 100%;
+  padding: 6px 8px;
+  background: #161624;
+  border: 1px solid #28283e;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-family: monospace;
+  box-sizing: border-box;
+}
+
+.dev-input-text:focus {
+  border-color: #00e5ff;
+  outline: none;
+}
+
+/* ACTION BUTTONS */
+.dev-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.dev-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #28283e;
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.dev-btn:hover {
+  background: #24243e;
+}
+
+.dev-btn-save {
+  background: #008855;
+  border-color: #00cc77;
+  color: #fff;
+}
+.dev-btn-save:hover {
+  background: #00aa66;
+}
+
+.dev-btn-sim {
+  background: #113355;
+  border-color: #00e5ff;
+  color: #00e5ff;
+}
+.dev-btn-sim:hover {
+  background: #194477;
+}
+
+.dev-toast {
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  margin-top: 10px;
+  background: #142820;
+  border: 1px solid #00cc66;
+  color: #55ffaa;
+  display: none;
+}
+
+/* ROUND ROBIN MATRIX TABLE */
+.dev-matrix-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+  border: 1px solid #242436;
+  border-radius: 4px;
+}
+
+.dev-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  font-family: monospace;
+}
+
+.dev-matrix-table th, .dev-matrix-table td {
+  padding: 6px 8px;
+  text-align: center;
+  border: 1px solid #1c1c2e;
+}
+
+.dev-matrix-table th {
+  background: #141424;
+  color: #8888aa;
+}
+
+.dev-matrix-table td.win-fav {
+  background: rgba(0, 255, 100, 0.15);
+  color: #00ff66;
+  font-weight: bold;
+}
+.dev-matrix-table td.loss-fav {
+  background: rgba(255, 0, 80, 0.15);
+  color: #ff3366;
+}
+.dev-matrix-table td.self {
+  background: #11111a;
+  color: #444455;
+}
+
+/* LEADERBOARD CARDS */
+.dev-lead-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #141424;
+  border: 1px solid #222234;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.dev-tier-badge {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 10px;
+  font-family: monospace;
+}
+.dev-tier-S { background: #ffaa00; color: #000; }
+.dev-tier-A { background: #00e5ff; color: #000; }
+.dev-tier-B { background: #00ff66; color: #000; }
+.dev-tier-C { background: #8888aa; color: #000; }
+.dev-tier-D { background: #ff3355; color: #fff; }

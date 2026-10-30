@@ -11,6 +11,7 @@ import { registerAllMinits } from './minits/index.js';
 import { LoadingScene } from './scenes/LoadingScene.js';
 import { EditorScene } from './scenes/EditorScene.js';
 import { SimulationScene } from './scenes/SimulationScene.js';
+import { DevConsole } from './dev/DevConsole.js';
 
 // Setup PIXI defaults for crisp HD pixel art
 PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
@@ -89,6 +90,8 @@ window.addEventListener('keydown', unlockAudio);
 
 // Boot game sequence
 console.log('⚔️ Booting Minit Duels HD Pixel Edition...');
+DevConsole.init(app);
+
 setScene(
   new LoadingScene(app, () => {
     goToEditor();

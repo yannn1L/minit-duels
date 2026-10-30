@@ -9,9 +9,10 @@ import { VFXPool } from './VFXPool.js';
 import { MinitEngine } from './Registry.js';
 
 export class Arena extends PIXI.Container {
-  constructor(pIds, texturesRef) {
+  constructor(pIds, texturesRef, options = {}) {
     super();
-    this.textures = texturesRef;
+    this.textures = texturesRef || {};
+    this.isHeadless = options.headless || false;
     this.shake = 0;
     this.hitStop = 0;
     const AW = CFG.GRID.COLS * CFG.GRID.TS;
@@ -191,10 +192,10 @@ export class Arena extends PIXI.Container {
     p.hp = Math.max(0, p.hp - payload.dmg);
     const pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
     const pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
-    const vfx = payload.hitVfx || {};
-
-    if (vfx.showText !== false) this.fxPool.spawnDmgText(pX, pY, payload.dmg, fxC);
-    if (vfx.playSound !== false) AudioSys.play(vfx.sound || 'hit', 0.6);
+    if (!this.isHeadless) {
+      if (vfx.showText !== false) this.fxPool.spawnDmgText(pX, pY, payload.dmg, fxC);
+      if (vfx.playSound !== false) AudioSys.play(vfx.sound || 'hit', 0.6);
+    }
 
     // Modular knockback handling from attack payload
     if (payload.knockback) {
@@ -218,22 +219,24 @@ export class Arena extends PIXI.Container {
     if (vfx.flash) this.triggerFlash(vfx.flash);
     if (vfx.hitStop) this.hitStop = Math.max(this.hitStop, vfx.hitStop);
 
-    const pC = vfx.particleCount ?? CFG.VFX.HIT.PARTICLE_COUNT;
-    for (let i = 0; i < pC; i++) {
-      const vx = FastMath.randRange(-CFG.VFX.HIT.BURST_FORCE, CFG.VFX.HIT.BURST_FORCE);
-      const vy = FastMath.randRange(-CFG.VFX.HIT.BURST_FORCE, CFG.VFX.HIT.BURST_FORCE);
-      this.fxPool.spawnPhysics(
-        vfx.particleTex || CFG.VFX.HIT.DEFAULT_TEX,
-        pX,
-        pY,
-        vx,
-        vy,
-        CFG.VFX.HIT.LIFE,
-        0.9,
-        0.9,
-        true,
-        fxC
-      );
+    if (!this.isHeadless) {
+      const pC = vfx.particleCount ?? CFG.VFX.HIT.PARTICLE_COUNT;
+      for (let i = 0; i < pC; i++) {
+        const vx = FastMath.randRange(-CFG.VFX.HIT.BURST_FORCE, CFG.VFX.HIT.BURST_FORCE);
+        const vy = FastMath.randRange(-CFG.VFX.HIT.BURST_FORCE, CFG.VFX.HIT.BURST_FORCE);
+        this.fxPool.spawnPhysics(
+          vfx.particleTex || CFG.VFX.HIT.DEFAULT_TEX,
+          pX,
+          pY,
+          vx,
+          vy,
+          CFG.VFX.HIT.LIFE,
+          0.9,
+          0.9,
+          true,
+          fxC
+        );
+      }
     }
 
     if (vfx.debuff && !p.debuffs[vfx.debuff.payload.id]) {
@@ -249,26 +252,28 @@ export class Arena extends PIXI.Container {
 
     if (p.hp <= 0) {
       const dVfx = p.def.deathVfx || {};
-      AudioSys.play(dVfx.sound || 'crush');
-      if (dVfx.flash) this.triggerFlash(dVfx.flash);
-      if (dVfx.shake) this.shake = Math.max(this.shake, dVfx.shake);
-      this.hitStop = Math.max(this.hitStop, dVfx.hitStop || CFG.JUICE.DEATH_HIT_STOP);
-      this.fxPool.spawnShockwave(pX, pY, p.def.color, dVfx.shockRad || CFG.VFX.DEATH.SHOCK_RAD, 6);
+      if (!this.isHeadless) {
+        AudioSys.play(dVfx.sound || 'crush');
+        if (dVfx.flash) this.triggerFlash(dVfx.flash);
+        if (dVfx.shake) this.shake = Math.max(this.shake, dVfx.shake);
+        this.hitStop = Math.max(this.hitStop, dVfx.hitStop || CFG.JUICE.DEATH_HIT_STOP);
+        this.fxPool.spawnShockwave(pX, pY, p.def.color, dVfx.shockRad || CFG.VFX.DEATH.SHOCK_RAD, 6);
 
-      const dpC = dVfx.particleCount ?? CFG.VFX.DEATH.PARTICLE_COUNT;
-      for (let i = 0; i < dpC; i++) {
-        this.fxPool.spawnPhysics(
-          CFG.VFX.HIT.DEFAULT_TEX,
-          pX,
-          pY,
-          FastMath.randRange(-CFG.VFX.DEATH.BURST_FORCE, CFG.VFX.DEATH.BURST_FORCE),
-          FastMath.randRange(-CFG.VFX.DEATH.BURST_FORCE, CFG.VFX.DEATH.BURST_FORCE),
-          CFG.VFX.DEATH.PARTICLE_LIFE,
-          0.9,
-          0.9,
-          true,
-          p.def.color
-        );
+        const dpC = dVfx.particleCount ?? CFG.VFX.DEATH.PARTICLE_COUNT;
+        for (let i = 0; i < dpC; i++) {
+          this.fxPool.spawnPhysics(
+            CFG.VFX.HIT.DEFAULT_TEX,
+            pX,
+            pY,
+            FastMath.randRange(-CFG.VFX.DEATH.BURST_FORCE, CFG.VFX.DEATH.BURST_FORCE),
+            FastMath.randRange(-CFG.VFX.DEATH.BURST_FORCE, CFG.VFX.DEATH.BURST_FORCE),
+            CFG.VFX.DEATH.PARTICLE_LIFE,
+            0.9,
+            0.9,
+            true,
+            p.def.color
+          );
+        }
       }
     }
   }

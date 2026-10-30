@@ -13,7 +13,7 @@ export const MINIT_IRONMEN = {
   name: 'Ironman',
   color: 0xff3333,
   desc: 'Missiles, Thruster ram, Chest laser.',
-  stats: { hp: 1350, speed: 0.14 },
+  stats: { hp: 1400, speed: 0.14 },
   targeting: { type: 'closest_enemy' },
 
   deathVfx: {
@@ -26,9 +26,9 @@ export const MINIT_IRONMEN = {
   },
 
   payload: {
-    missileDmg: 31,
+    missileDmg: 32,
     ramDmg: 65,
-    beamTickDmg: 12,
+    beamTickDmg: 13,
     knockbackForce: 1.25,
     zoneRadius: 1.5,
     destroyOnHit: true,
@@ -43,9 +43,9 @@ export const MINIT_IRONMEN = {
   },
 
   action: {
-    cd: 150,
+    cd: 120,
     count: 1,
-    speed: 0,
+    speed: 0.14,
     life: 60,
     traitList: ['ironTripleAbilityController']
   },
@@ -293,7 +293,7 @@ export const MINIT_IRONMEN = {
             p: {
               ownerId: owner.id,
               color: 0xff3333,
-              speed: 0.24,
+              speed: 0.14,
               maxSpeed: 0.54,
               turnRate: 0.15,
               payload: e.p.payload,
