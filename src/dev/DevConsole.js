@@ -213,9 +213,11 @@ export class DevConsole {
         </div>
       </div>
 
-      <div class="dev-btn-row">
-        <button class="dev-btn dev-btn-save" id="btn-save-disk">💾 SAVE TO FILE DIRECTLY</button>
-        <button class="dev-btn" id="btn-reset-memory">↺ RESET DEFAULT</button>
+      <div class="dev-btn-row" style="flex-wrap: wrap;">
+        <button class="dev-btn dev-btn-save" id="btn-save-disk" style="min-width: 140px;">💾 SAVE TO FILE</button>
+        <button class="dev-btn" id="btn-copy-code">📋 COPY CODE</button>
+        <button class="dev-btn" id="btn-download-file">📥 DOWNLOAD</button>
+        <button class="dev-btn" id="btn-reset-memory">↺ RESET</button>
       </div>
     `;
 
@@ -357,6 +359,39 @@ export class DevConsole {
       }
     };
 
+    // Copy Code to Clipboard
+    container.querySelector('#btn-copy-code').onclick = async () => {
+      const code = await DevConsole._generateMinitCode(current, stats, payload, action, textures);
+      try {
+        await navigator.clipboard.writeText(code);
+        this._showToast(`✓ Copied src/minits/${current.id}.js to clipboard!`);
+      } catch (e) {
+        // Fallback for iframe restrictions
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        this._showToast(`✓ Copied src/minits/${current.id}.js to clipboard!`);
+      }
+    };
+
+    // Download .js File
+    container.querySelector('#btn-download-file').onclick = async () => {
+      const code = await DevConsole._generateMinitCode(current, stats, payload, action, textures);
+      const blob = new Blob([code], { type: 'text/javascript' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${current.id}.js`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this._showToast(`✓ Downloaded ${current.id}.js!`);
+    };
+
     // Reset In-Memory to Defaults
     container.querySelector('#btn-reset-memory').onclick = () => {
       const orig = this.originalSnapshot[current.id];
@@ -370,6 +405,33 @@ export class DevConsole {
         this._render();
       }
     };
+  }
+
+  static async _generateMinitCode(current, stats, payload, action, textures) {
+    let baseCode = '';
+    try {
+      const res = await fetch(`/src/minits/${current.id}.js`);
+      if (res.ok) baseCode = await res.text();
+    } catch (e) {}
+
+    if (baseCode) {
+      if (stats.hp !== undefined) baseCode = baseCode.replace(/(hp:\s*)\d+(\.\d+)?/g, `$1${stats.hp}`);
+      if (stats.speed !== undefined) baseCode = baseCode.replace(/(speed:\s*)\d+(\.\d+)?/g, `$1${stats.speed}`);
+      if (action.cd !== undefined) baseCode = baseCode.replace(/(cd:\s*)\d+/g, `$1${action.cd}`);
+      if (payload.dmg !== undefined) baseCode = baseCode.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.dmg}`);
+      if (payload.missileDmg !== undefined) baseCode = baseCode.replace(/(missileDmg:\s*)\d+(\.\d+)?/g, `$1${payload.missileDmg}`);
+      if (payload.ramDmg !== undefined) baseCode = baseCode.replace(/(ramDmg:\s*)\d+(\.\d+)?/g, `$1${payload.ramDmg}`);
+      if (payload.beamTickDmg !== undefined) baseCode = baseCode.replace(/(beamTickDmg:\s*)\d+(\.\d+)?/g, `$1${payload.beamTickDmg}`);
+      if (textures) {
+        for (const [tKey, tPath] of Object.entries(textures)) {
+          const reg = new RegExp(`(${tKey}:\\s*['"])[^'"]+(['"])`, 'g');
+          baseCode = baseCode.replace(reg, `$1${tPath}$2`);
+        }
+      }
+      return baseCode;
+    }
+
+    return `// Updated ${current.name}\nexport const MINIT_${current.id.toUpperCase()} = ${JSON.stringify(current, null, 2)};`;
   }
 
   static _hotSwapTexture(minitId, textureKey, sourceUrl) {

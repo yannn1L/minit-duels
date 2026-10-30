@@ -315,6 +315,50 @@ Add `/?dev` to your browser URL (e.g. `http://localhost:3000/?dev`) to access th
 
 ---
 
+## 🔄 How to Save Changes & Push to GitHub
+
+When you tune minits, change stats, or swap textures in Developer Mode (`/?dev`), here is how the data flows and how to push your changes to GitHub:
+
+### 1. Saving to Project Files
+- **In-Memory Live Testing**: Moving sliders changes stats in your browser immediately so you can test battles in real-time.
+- **Save to Disk**: Click **"💾 SAVE TO FILE"** in the dev panel. This sends a request to the local Vite dev server, which updates `src/minits/<id>.js` on disk.
+- **Copy / Download Fallback**: You can also click **"📋 COPY CODE"** to copy the updated file content to your clipboard, or **"📥 DOWNLOAD"** to download `<id>.js`.
+
+### 2. Pushing to GitHub (Choose Any Method)
+
+#### Method A: Google AI Studio UI (Fastest)
+1. In the **Google AI Studio** workspace interface, look at the top-right header or left sidebar for the **GitHub / Version Control** icon (or "Sync / Export").
+2. Review the modified files (`src/minits/<id>.js`).
+3. Type a commit message (e.g., `Update minit stats & balance tuning`).
+4. Click **Commit & Push**. GitHub will receive the commit, and GitHub Actions will automatically rebuild and deploy to GitHub Pages!
+
+#### Method B: GitHub Web Editor (Direct)
+1. In the Dev Console (`/?dev`), click **"📋 COPY CODE"** for the modified minit.
+2. Go to your repository on GitHub: `https://github.com/<your-username>/minit-duels/blob/main/src/minits/<id>.js`.
+3. Click the pencil icon (✏️ **Edit this file**).
+4. Select all and paste the copied code.
+5. Click **Commit changes...** at the top right.
+
+#### Method C: Git CLI (Local Clone)
+If you have cloned the repository locally on your computer:
+```bash
+# Check modified minit files
+git status
+
+# Stage the updated minit files
+git add src/minits/
+
+# Commit with a descriptive message
+git commit -m "Balance minits and update stats"
+
+# Push to your GitHub repository
+git push origin main
+```
+
+Once pushed, GitHub Actions will automatically run `npm run build` and publish your latest balance updates to GitHub Pages!
+
+---
+
 ## 🚀 Development & Build
 
 ```bash
