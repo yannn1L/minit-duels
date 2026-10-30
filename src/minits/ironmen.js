@@ -13,7 +13,7 @@ export const MINIT_IRONMEN = {
   name: 'Ironman',
   color: 0xff3333,
   desc: 'Missiles, Thruster ram, Chest laser.',
-  stats: { hp: 1400, speed: 0.14 },
+  stats: { hp: 1500, speed: 0.14 },
   targeting: { type: 'closest_enemy' },
 
   deathVfx: {

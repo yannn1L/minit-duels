@@ -51,8 +51,8 @@ export const MINIT_MOTH = {
         traitList: ['moveAndBounce', 'damageRadiusOnHit', 'mothBombVisual', 'ageLife']
       }
     },
-    zoneRadius: 3.0,
-    dmg: 48,
+    zoneRadius: 1.0,
+    dmg: 100,
     destroyOnHit: true
   },
 

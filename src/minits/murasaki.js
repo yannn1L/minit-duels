@@ -23,7 +23,7 @@ export const MINIT_MURASAKI = {
   },
 
   payload: {
-    dmg: 25
+    dmg: 22
   },
 
   action: { cd: 360, count: 1, speed: 0, life: 180, traitList: ['hollowPurpleSequence'] },
