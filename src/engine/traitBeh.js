@@ -14,14 +14,14 @@ export function registerTraitsAndTargeting() {
   // Target the closest enemy
   MinitEngine.Registry.addTargeting('closest_enemy', (owner, arena) => {
     let closestTarget = null;
-    let minDistance = Infinity;
+    let minDistSq = Infinity;
 
     for (let i = 0; i < arena.players.length; i++) {
       const player = arena.players[i];
       if (player.id !== owner.id && player.hp > 0) {
-        const distance = FastMath.dist(owner.x, owner.y, player.x, player.y);
-        if (distance < minDistance) {
-          minDistance = distance;
+        const dSq = FastMath.distSq(owner.x, owner.y, player.x, player.y);
+        if (dSq < minDistSq) {
+          minDistSq = dSq;
           closestTarget = player;
         }
       }
@@ -155,17 +155,20 @@ export function registerTraitsAndTargeting() {
     if (!pay) return;
 
     e.p.leechSuccess = false;
-    const owner = a.players.find((pl) => pl.id === e.p.ownerId);
+    const owner = a.playerMap?.[e.p.ownerId] || a.players.find((pl) => pl.id === e.p.ownerId);
     const dMult = owner ? (owner.dmgMult || 1.0) : 1.0;
 
     const tickRate = e.p.payload.tickRate || 10;
     const isTick = e.l % tickRate === 0;
+    const zoneRadius = e.p.payload.zoneRadius || 1.5;
+    const zoneRadSq = zoneRadius * zoneRadius;
 
-    a.players.forEach((p) => {
+    for (let pIdx = 0; pIdx < a.players.length; pIdx++) {
+      const p = a.players[pIdx];
       if (
         p.id !== e.p.ownerId &&
         p.hp > 0 &&
-        FastMath.dist(p.x, p.y, e.x, e.y) <= e.p.payload.zoneRadius
+        FastMath.distSq(p.x, p.y, e.x, e.y) <= zoneRadSq
       ) {
         e.p.leechSuccess = true;
 
@@ -212,7 +215,7 @@ export function registerTraitsAndTargeting() {
           }
         }
       }
-    });
+    }
   });
 
   // TRAIT BUFF: Boost owner stats if drain was successful
@@ -308,8 +311,10 @@ export function registerTraitsAndTargeting() {
   // Universal: Apply status effect in radius
   MinitEngine.Registry.addTrait('applyStatusInRadius', (e, a) => {
     const radius = e.p.payload.zoneRadius || 1.5;
-    a.players.forEach((p) => {
-      if (p.id !== e.p.ownerId && p.hp > 0 && FastMath.dist(p.x, p.y, e.x, e.y) <= radius) {
+    const radSq = radius * radius;
+    for (let pIdx = 0; pIdx < a.players.length; pIdx++) {
+      const p = a.players[pIdx];
+      if (p.id !== e.p.ownerId && p.hp > 0 && FastMath.distSq(p.x, p.y, e.x, e.y) <= radSq) {
         const debuff = e.p.payload.debuff;
         if (debuff && !p.debuffs[debuff.payload.id]) {
           p.debuffs[debuff.payload.id] = true;
@@ -322,26 +327,29 @@ export function registerTraitsAndTargeting() {
           });
         }
       }
-    });
+    }
   });
 
   // Universal: Damage in radius on hit
   MinitEngine.Registry.addTrait('damageRadiusOnHit', (e, a) => {
-    const owner = a.players.find((p) => p.id === e.p.ownerId);
+    const owner = a.playerMap?.[e.p.ownerId] || a.players.find((p) => p.id === e.p.ownerId);
     const dMult = owner ? (owner.dmgMult || 1.0) : 1.0;
     let hasHit = false;
+    const rad = e.p.vfx?.radius || e.p.payload?.zoneRadius || 1.5;
+    const radSq = rad * rad;
 
-    a.players.forEach((p) => {
+    for (let pIdx = 0; pIdx < a.players.length; pIdx++) {
+      const p = a.players[pIdx];
       if (
         e.p.ownerId !== p.id &&
         p.hp > 0 &&
-        FastMath.dist(e.x, e.y, p.x, p.y) < (e.p.vfx?.radius || e.p.payload?.zoneRadius || 1.5)
+        FastMath.distSq(e.x, e.y, p.x, p.y) < radSq
       ) {
         const finalDmg = e.p.payload.dmg * dMult;
         a.damagePlayer(p.id, { ...e.p.payload, dmg: finalDmg }, e.p.color);
         hasHit = true;
       }
-    });
+    }
 
     if (hasHit && e.p.payload.destroyOnHit !== false) {
       e.dead = true;

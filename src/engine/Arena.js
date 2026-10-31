@@ -1,5 +1,6 @@
 // ============================================================
 // ARENA & COMBAT SIMULATION (ES Module - Crisp HD Pixel Edition)
+// High-performance Zero-GC combat loop & modular entity pooling
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG } from '../config.js';
@@ -67,8 +68,10 @@ export class Arena extends PIXI.Container {
 
     // Players - 100% shader-free for crystal-clear HD pixel sprites
     this.players = [];
+    this.playerMap = {};
+
     pIds.forEach((id, idx) => {
-      const md = MinitEngine.Registry.minits[id];
+      const md = MinitEngine.Registry.getMinit(id) || MinitEngine.Registry.minits[id];
       const tex = this.textures[`minit_${id}_base`];
       const spr = new PIXI.Sprite(tex || PIXI.Texture.WHITE);
       spr.anchor.set(0.5);
@@ -78,7 +81,7 @@ export class Arena extends PIXI.Container {
       const sY = Math.floor(CFG.GRID.ROWS / 2);
       const sSpX = idx === 0 ? md.stats.speed : -md.stats.speed;
 
-      this.players.push({
+      const pData = {
         id: `P${idx + 1}`,
         def: md,
         hp: md.stats.hp,
@@ -94,7 +97,10 @@ export class Arena extends PIXI.Container {
         fT: 0,
         activeStatuses: new Set(),
         debuffs: {}
-      });
+      };
+
+      this.players.push(pData);
+      this.playerMap[pData.id] = pData;
     });
 
     this.fxO = new PIXI.Container();
@@ -103,6 +109,7 @@ export class Arena extends PIXI.Container {
     this.beamRenderer = new BeamRenderer(this.layer, this.fxPool, this.textures);
 
     this.actE = [];
+    // Pre-allocated entity pool to eliminate garbage collection pauses
     this.deadE = Array.from({ length: 600 }, () => ({
       active: false,
       dead: false,
@@ -133,26 +140,26 @@ export class Arena extends PIXI.Container {
 
   getValidTarget(oId, rule) {
     const lg = MinitEngine.Registry.targeting[rule?.type];
-    return lg ? lg(this.players.find((p) => p.id === oId), this) : null;
+    const owner = this.playerMap[oId] || this.players.find((p) => p.id === oId);
+    return lg && owner ? lg(owner, this) : null;
   }
 
+  // Optimized Zero-GC Entity Spawner (avoids Object.assign allocation)
   spawnEnt(props) {
     if (this.deadE.length === 0) return;
     const e = this.deadE.pop();
-    Object.assign(e, {
-      active: true,
-      dead: false,
-      x: props.x ?? 0,
-      y: props.y ?? 0,
-      curX: props.x ?? 0,
-      curY: props.y ?? 0,
-      dx: props.dx ?? 0,
-      dy: props.dy ?? 0,
-      l: props.l ?? 0,
-      maxL: props.maxL ?? props.l ?? 0,
-      traits: props.traits || [],
-      p: props.p || {}
-    });
+    e.active = true;
+    e.dead = false;
+    e.x = props.x ?? 0;
+    e.y = props.y ?? 0;
+    e.curX = props.x ?? 0;
+    e.curY = props.y ?? 0;
+    e.dx = props.dx ?? 0;
+    e.dy = props.dy ?? 0;
+    e.l = props.l ?? 0;
+    e.maxL = props.maxL ?? props.l ?? 0;
+    e.traits = props.traits || [];
+    e.p = props.p || {};
     this.actE.push(e);
   }
 
@@ -160,9 +167,9 @@ export class Arena extends PIXI.Container {
     this.fA = Math.max(this.fA, a);
   }
 
-  // Modular & Flexible Knockback System for any Minit
+  // Modular & Flexible Knockback System with O(1) lookup
   applyKnockback(targetId, { fromX, fromY, forceX, forceY, force = 0.65, shake = 6, playSound = false }) {
-    const p = this.players.find((pl) => pl.id === targetId);
+    const p = this.playerMap[targetId] || this.players.find((pl) => pl.id === targetId);
     if (!p || p.hp <= 0) return;
 
     let kx = forceX || 0;
@@ -170,7 +177,7 @@ export class Arena extends PIXI.Container {
 
     // Calculate radial knockback away from source coordinates if provided
     if (fromX !== undefined && fromY !== undefined) {
-      const angle = Math.atan2(p.y - fromY, p.x - fromX);
+      const angle = FastMath.angle(fromX, fromY, p.x, p.y);
       kx = Math.cos(angle) * force;
       ky = Math.sin(angle) * force;
     }
@@ -188,7 +195,7 @@ export class Arena extends PIXI.Container {
   }
 
   damagePlayer(pid, payload = {}, fxC) {
-    const p = this.players.find((pl) => pl.id === pid);
+    const p = this.playerMap[pid] || this.players.find((pl) => pl.id === pid);
     if (!p || p.hp <= 0) return;
 
     const dmg = payload.dmg || 0;
@@ -285,7 +292,7 @@ export class Arena extends PIXI.Container {
 
   executeAction(owner, tgt) {
     const act = owner.def.action;
-    const bA = Math.atan2(tgt.y - owner.y, tgt.x - owner.x);
+    const bA = FastMath.angle(owner.x, owner.y, tgt.x, tgt.y);
     if (act.sound) AudioSys.play(act.sound);
 
     const count = act.count || 1;
@@ -319,14 +326,16 @@ export class Arena extends PIXI.Container {
   }
 
   tickLogic() {
-    this.players.forEach((p) => {
-      if (p.hp <= 0) return;
+    // Fast indexed iteration over players
+    for (let pIdx = 0; pIdx < this.players.length; pIdx++) {
+      const p = this.players[pIdx];
+      if (p.hp <= 0) continue;
       p.activeStatuses.clear();
       const w = CFG.PHYSICS.WANDER;
       const s = p.def.stats.speed;
 
       if (w > 0 && s > 0) {
-        let a = p.dx === 0 && p.dy === 0 ? FastMath.randRange(0, Math.PI * 2) : Math.atan2(p.dy, p.dx);
+        let a = p.dx === 0 && p.dy === 0 ? FastMath.randRange(0, FastMath.TWO_PI) : Math.atan2(p.dy, p.dx);
         a += FastMath.randRange(-w, w);
         p.dx = Math.cos(a) * s;
         p.dy = Math.sin(a) * s;
@@ -337,14 +346,14 @@ export class Arena extends PIXI.Container {
       const bS = p.baseScale || 1.0;
 
       if (p.x < CFG.ARENA_BOUNDS.MIN_X || p.x > CFG.ARENA_BOUNDS.MAX_X) {
-        p.x = Math.max(CFG.ARENA_BOUNDS.MIN_X, Math.min(p.x, CFG.ARENA_BOUNDS.MAX_X));
+        p.x = FastMath.clamp(p.x, CFG.ARENA_BOUNDS.MIN_X, CFG.ARENA_BOUNDS.MAX_X);
         p.dx *= CFG.PHYSICS.BOUNCE;
         p.aS.tX = bS * CFG.JUICE.BOUNCE_X.tX;
         p.aS.tY = bS * CFG.JUICE.BOUNCE_X.tY;
         AudioSys.play('hit', 0.2);
       }
       if (p.y < CFG.ARENA_BOUNDS.MIN_Y || p.y > CFG.ARENA_BOUNDS.MAX_Y) {
-        p.y = Math.max(CFG.ARENA_BOUNDS.MIN_Y, Math.min(p.y, CFG.ARENA_BOUNDS.MAX_Y));
+        p.y = FastMath.clamp(p.y, CFG.ARENA_BOUNDS.MIN_Y, CFG.ARENA_BOUNDS.MAX_Y);
         p.dy *= CFG.PHYSICS.BOUNCE;
         p.aS.tX = bS * CFG.JUICE.BOUNCE_Y.tX;
         p.aS.tY = bS * CFG.JUICE.BOUNCE_Y.tY;
@@ -358,11 +367,13 @@ export class Arena extends PIXI.Container {
         const tgt = this.getValidTarget(p.id, p.def.targeting);
         if (tgt) this.executeAction(p, tgt);
       }
-    });
+    }
 
+    // High-performance backward entity iteration
     for (let i = this.actE.length - 1; i >= 0; i--) {
       const e = this.actE[i];
-      for (let j = 0; j < e.traits.length; j++) {
+      const traitCount = e.traits.length;
+      for (let j = 0; j < traitCount; j++) {
         const tl = MinitEngine.Registry.traits[e.traits[j]];
         if (tl) tl(e, this);
       }
@@ -370,6 +381,7 @@ export class Arena extends PIXI.Container {
         if (e.p && e.p.beamId && this.beamRenderer) {
           this.beamRenderer.removeBeam(e.p.beamId);
         }
+        // Swap-and-pop for zero array shift allocation
         this.actE[i] = this.actE[this.actE.length - 1];
         this.actE.pop();
         this.deadE.push(e);
@@ -378,10 +390,11 @@ export class Arena extends PIXI.Container {
   }
 
   updateVisuals(tS) {
-    this.players.forEach((p) => {
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i];
       if (p.hp <= 0) {
         p.spr.visible = false;
-        return;
+        continue;
       }
       const pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
       const pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
@@ -397,14 +410,14 @@ export class Arena extends PIXI.Container {
       p.aS.y += (p.aS.tY - p.aS.y) * CFG.RENDER.SPRING_DAMP * tS;
       p.spr.scale.set(p.aS.x, p.aS.y);
 
-      // Damage flash matching texture silhouette (tweakable in config.js)
+      // Damage flash matching texture silhouette
       if (p.fT > 0) {
         p.fT -= tS;
         p.spr.tint = CFG.JUICE.HIT_FLASH_COLOR;
       } else {
         p.spr.tint = 0xffffff;
       }
-    });
+    }
 
     this.fxPool.update(tS);
     if (this.beamRenderer) {

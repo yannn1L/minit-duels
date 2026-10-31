@@ -1,5 +1,6 @@
 // ============================================================
 // MINIT FACTORY & REGISTRATION (ES Module)
+// Modular registry manager & exported roster
 // ============================================================
 import { MinitEngine } from '../engine/Registry.js';
 import { MINIT_LASER } from './laser.js';
@@ -27,3 +28,26 @@ export function registerAllMinits() {
     MinitEngine.Registry.addMinit(minit);
   });
 }
+
+export function getMinitById(id) {
+  return MinitEngine.Registry.getMinit(id);
+}
+
+export function getAllMinitList() {
+  return ALL_MINITS;
+}
+
+export function getMinitCount() {
+  return ALL_MINITS.length;
+}
+
+export {
+  MINIT_LASER,
+  MINIT_PULSAR,
+  MINIT_ABSORB,
+  MINIT_WAVES,
+  MINIT_MOTH,
+  MINIT_MURASAKI,
+  MINIT_IRONMEN,
+  MINIT_SAITAMA
+};

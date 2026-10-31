@@ -1,6 +1,6 @@
 # ⚔️ Minit Duels
 
-An arcade 1v1 pixel auto-battler game built with **PixiJS (WebGL)**, **Synthesized Web Audio API**, and **Vite**. Features responsive dual-orientation layouts (Desktop Landscape & Mobile Portrait), crisp HD subpixel rendering, modular knockback mechanics, and an in-browser developer suite (`/?dev`) with live stats tuning, direct disk persistence, and a headless round-robin balancing simulator.
+An arcade 1v1 pixel auto-battler game built with **PixiJS (WebGL)**, **Synthesized Web Audio API**, and **Vite**. Features responsive dual-orientation layouts (Desktop Landscape & Mobile Portrait), crisp HD subpixel rendering, modular knockback mechanics, and diverse minit combat traits.
 
 ---
 
@@ -19,11 +19,6 @@ An arcade 1v1 pixel auto-battler game built with **PixiJS (WebGL)**, **Synthesiz
   - Supersonic thruster ram dash with wall bouncing.
   - Piercing Unibeam and Hollow Purple energy rays.
   - Spore swarms, expanding vortex suction zones, and harmonic shockwaves.
-- **In-Browser Developer Suite (`/?dev`)**:
-  - Real-time stat editor (HP, Speed, Cooldown, Damages).
-  - Direct disk file persistence via local Vite dev server API.
-  - Multi-texture editor with external file import (`.png`, `.svg`).
-  - Headless round-robin tournament simulator running 400+ duels in seconds to output win-rate matrices and tier rankings.
 
 ---
 
@@ -41,8 +36,11 @@ An arcade 1v1 pixel auto-battler game built with **PixiJS (WebGL)**, **Synthesiz
 │   │   ├── AssetBaker.js     # Texture loading, nearest-neighbor scaling & procedural baking
 │   │   ├── AssetTemplate.js  # Base visual assets, grid floor & guard graphics
 │   │   ├── AudioSys.js       # Synthesized sound engine (Web Audio API oscillators)
+│   │   ├── BeamRenderer.js   # Multi-layered glowing vector beam renderer & lightning arcs
 │   │   ├── FastMath.js       # Fast lookup tables (Sin, Cos, distances, RNG)
+│   │   ├── MinitContract.js  # Schema contract validation & fallback sanitization
 │   │   ├── Registry.js       # Global registry for minits, traits, targeting & textures
+│   │   ├── SceneManager.js   # Viewport scaling, orientation listener & scene lifecycle
 │   │   ├── traitBeh.js       # Entity Component System (ECS) trait behaviors
 │   │   └── VFXPool.js        # Object pooling for damage popups, particles & shockwaves
 │   ├── minits/
@@ -53,16 +51,13 @@ An arcade 1v1 pixel auto-battler game built with **PixiJS (WebGL)**, **Synthesiz
 │   │   ├── waves.js          # Rhythm shockwave minit
 │   │   ├── moth.js           # Cocoon incubation & winged moth minit
 │   │   ├── murasaki.js       # Gojo Hollow Purple & cursed aura minit
-│   │   └── ironmen.js        # Ironman (4 Homing Missiles, Thruster Ram, Unibeam)
-│   ├── dev/
-│   │   ├── DevConsole.js     # Floating in-browser dev panel (active at /?dev)
-│   │   ├── devStyles.css     # Cyber-dark styles for dev console
-│   │   └── HeadlessSimulator.js # Headless tournament & balancing matrix runner
+│   │   ├── ironmen.js        # Ironman (4 Homing Missiles, Thruster Ram, Unibeam)
+│   │   └── saitama.js        # Saitama (Consecutive, Serious & 9999 Death Punch)
 │   └── scenes/
 │       ├── LoadingScene.js   # Asset loading & system boot screen
 │       ├── EditorScene.js    # Compact character selection menu
 │       └── SimulationScene.js# Real-time combat scene with HUDs
-├── vite.config.ts            # Vite config with dev-server disk persistence plugin
+├── vite.config.ts            # Vite configuration
 └── package.json
 ```
 
@@ -298,31 +293,9 @@ customTraits: {
 
 ---
 
-## 🛠️ Developer Suite (`/?dev`)
+## 🔄 How to Push Changes to GitHub
 
-Add `/?dev` to your browser URL (e.g. `http://localhost:3000/?dev`) to access the in-game developer panel:
-
-1. **Live Stats Editor**:
-   - Tweak Max HP, Speed, Action Cooldown, and Attack Damages live.
-   - Click **"💾 SAVE TO FILE DIRECTLY"** to permanently write changes into `src/minits/<id>.js` on disk.
-2. **Multi-Texture Importer**:
-   - Browse and upload `.png` or `.svg` files from your computer. Files are saved directly to `public/assets/minit_icon/` and live-reloaded into WebGL.
-3. **Import Minit File**:
-   - Drag and drop a `minit <id>.js` file into the web panel and click **"💾 SAVE TO PROJECT FILES"** to commit the file to `src/minits/` and auto-register it into `src/minits/index.js`.
-4. **Headless Balancing Test**:
-   - Run 10, 20, or 30 rounds of headless round-robin duels.
-   - Evaluates win-rate leaderboards, tier ratings (S+, A, B, C, D), and a $7 \times 7$ head-to-head matchup matrix.
-
----
-
-## 🔄 How to Save Changes & Push to GitHub
-
-When you tune minits, change stats, or swap textures in Developer Mode (`/?dev`), here is how the data flows and how to push your changes to GitHub:
-
-### 1. Saving to Project Files
-- **In-Memory Live Testing**: Moving sliders changes stats in your browser immediately so you can test battles in real-time.
-- **Save to Disk**: Click **"💾 SAVE TO FILE"** in the dev panel. This sends a request to the local Vite dev server, which updates `src/minits/<id>.js` on disk.
-- **Copy / Download Fallback**: You can also click **"📋 COPY CODE"** to copy the updated file content to your clipboard, or **"📥 DOWNLOAD"** to download `<id>.js`.
+When you edit minits in `src/minits/` (e.g. tuning stats, damages, or behaviors), here is how to push your changes to GitHub:
 
 ### 2. Pushing to GitHub (Choose Any Method)
 
