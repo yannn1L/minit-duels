@@ -248,8 +248,46 @@ export class DevConsole {
           <input type="range" class="dev-input-range" id="input-dmg" min="5" max="50" step="1" value="${debuffPay.dmg || 20}">
         </div>
       `;
+    } else if (current.id === 'murasaki') {
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Chanting Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="120" max="500" step="10" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Initial Burst Impact Damage</span><span class="dev-field-value" id="val-murasaki-init">${payload.initialDmg || 85}</span></div>
+          <input type="range" class="dev-input-range" id="input-murasaki-init" min="20" max="250" step="5" value="${payload.initialDmg || 85}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Electric Aura Tick Damage</span><span class="dev-field-value" id="val-murasaki-elec">${payload.electricTickDmg || 9}</span></div>
+          <input type="range" class="dev-input-range" id="input-murasaki-elec" min="1" max="30" step="1" value="${payload.electricTickDmg || 9}">
+        </div>
+      `;
+    } else if (current.id === 'saitama') {
+      specificControlsHtml = `
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Cycle Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd}</span></div>
+          <input type="range" class="dev-input-range" id="input-cd" min="60" max="360" step="10" value="${action.cd}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Normal Barrage Damage/Fist</span><span class="dev-field-value" id="val-saitama-barrage">${payload.barrageDmg || 14}</span></div>
+          <input type="range" class="dev-input-range" id="input-saitama-barrage" min="4" max="50" step="1" value="${payload.barrageDmg || 14}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Serious Punch Damage</span><span class="dev-field-value" id="val-saitama-serious">${payload.seriousDmg || 115}</span></div>
+          <input type="range" class="dev-input-range" id="input-saitama-serious" min="40" max="300" step="5" value="${payload.seriousDmg || 115}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Ability 3 Death Punch Damage</span><span class="dev-field-value" id="val-saitama-death">${payload.deathDmg || 9999}</span></div>
+          <input type="range" class="dev-input-range" id="input-saitama-death" min="1000" max="9999" step="100" value="${payload.deathDmg || 9999}">
+        </div>
+        <div class="dev-field-group">
+          <div class="dev-field-label"><span>Serious Knockback Force</span><span class="dev-field-value" id="val-saitama-kb">${payload.knockbackForce || 1.6}</span></div>
+          <input type="range" class="dev-input-range" id="input-saitama-kb" min="0.5" max="3.0" step="0.1" value="${payload.knockbackForce || 1.6}">
+        </div>
+      `;
     } else {
-      // Gojo / Generic
+      // Generic
       specificControlsHtml = `
         <div class="dev-field-group">
           <div class="dev-field-label"><span>Ability Cooldown (CD)</span><span class="dev-field-value" id="val-cd">${action.cd || 180}</span></div>
@@ -469,6 +507,7 @@ export class DevConsole {
         inpDmg.oninput = (e) => {
           const v = Number(e.target.value);
           payload.baseDmg = v;
+          if (payload.beamConfig) payload.beamConfig.damage = v;
           container.querySelector('#val-dmg').innerText = v;
         };
       }
@@ -488,6 +527,56 @@ export class DevConsole {
           const v = Number(e.target.value);
           payload.debuff.payload.dmg = v;
           container.querySelector('#val-dmg').innerText = v;
+        };
+      }
+    } else if (current.id === 'murasaki') {
+      const inpInit = container.querySelector('#input-murasaki-init');
+      if (inpInit) {
+        inpInit.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.initialDmg = v;
+          container.querySelector('#val-murasaki-init').innerText = v;
+        };
+      }
+      const inpElec = container.querySelector('#input-murasaki-elec');
+      if (inpElec) {
+        inpElec.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.electricTickDmg = v;
+          container.querySelector('#val-murasaki-elec').innerText = v;
+        };
+      }
+    } else if (current.id === 'saitama') {
+      const inpBarrage = container.querySelector('#input-saitama-barrage');
+      if (inpBarrage) {
+        inpBarrage.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.barrageDmg = v;
+          container.querySelector('#val-saitama-barrage').innerText = v;
+        };
+      }
+      const inpSerious = container.querySelector('#input-saitama-serious');
+      if (inpSerious) {
+        inpSerious.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.seriousDmg = v;
+          container.querySelector('#val-saitama-serious').innerText = v;
+        };
+      }
+      const inpDeath = container.querySelector('#input-saitama-death');
+      if (inpDeath) {
+        inpDeath.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.deathDmg = v;
+          container.querySelector('#val-saitama-death').innerText = v;
+        };
+      }
+      const inpKb = container.querySelector('#input-saitama-kb');
+      if (inpKb) {
+        inpKb.oninput = (e) => {
+          const v = Number(e.target.value);
+          payload.knockbackForce = v;
+          container.querySelector('#val-saitama-kb').innerText = v;
         };
       }
     } else {
@@ -699,6 +788,7 @@ export class DevConsole {
       } else if (current.id === 'laser') {
         if (payload.baseDmg !== undefined) {
           baseCode = baseCode.replace(/(baseDmg:\s*)\d+(\.\d+)?/g, `$1${payload.baseDmg}`);
+          baseCode = baseCode.replace(/(damage:\s*)\d+(\.\d+)?/g, `$1${payload.baseDmg}`);
         }
       } else if (current.id === 'pulsar') {
         if (payload.bulletDmg !== undefined) {
@@ -707,6 +797,26 @@ export class DevConsole {
       } else if (current.id === 'waves') {
         if (payload.debuff?.payload?.dmg !== undefined) {
           baseCode = baseCode.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.debuff.payload.dmg}`);
+        }
+      } else if (current.id === 'murasaki') {
+        if (payload.initialDmg !== undefined) {
+          baseCode = baseCode.replace(/(initialDmg:\s*)\d+(\.\d+)?/g, `$1${payload.initialDmg}`);
+        }
+        if (payload.electricTickDmg !== undefined) {
+          baseCode = baseCode.replace(/(electricTickDmg:\s*)\d+(\.\d+)?/g, `$1${payload.electricTickDmg}`);
+        }
+      } else if (current.id === 'saitama') {
+        if (payload.barrageDmg !== undefined) {
+          baseCode = baseCode.replace(/(barrageDmg:\s*)\d+(\.\d+)?/g, `$1${payload.barrageDmg}`);
+        }
+        if (payload.seriousDmg !== undefined) {
+          baseCode = baseCode.replace(/(seriousDmg:\s*)\d+(\.\d+)?/g, `$1${payload.seriousDmg}`);
+        }
+        if (payload.deathDmg !== undefined) {
+          baseCode = baseCode.replace(/(deathDmg:\s*)\d+(\.\d+)?/g, `$1${payload.deathDmg}`);
+        }
+        if (payload.knockbackForce !== undefined) {
+          baseCode = baseCode.replace(/(knockbackForce:\s*)\d+(\.\d+)?/g, `$1${payload.knockbackForce}`);
         }
       } else if (payload.dmg !== undefined) {
         baseCode = baseCode.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.dmg}`);

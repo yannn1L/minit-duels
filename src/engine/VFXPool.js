@@ -66,7 +66,8 @@ export class VFXPool {
     dragX = CFG.PHYSICS.DRAG_X,
     dragY = CFG.PHYSICS.DRAG_Y,
     scaleDown = false,
-    tint = 0xffffff
+    tint = 0xffffff,
+    baseAlpha = 1.0
   ) {
     if (this.pool.phys.length === 0) return;
     const tex = this.textures[texKey];
@@ -84,8 +85,9 @@ export class VFXPool {
     s.dragY = dragY;
     s.sD = scaleDown;
     s.tint = tint;
+    s.baseAlpha = baseAlpha;
     s.visible = true;
-    s.alpha = 1;
+    s.alpha = baseAlpha;
     s.scale.set(1);
     s.rotation = FastMath.rand() * 6.28;
     this.act.phys.push(s);
@@ -107,10 +109,11 @@ export class VFXPool {
     this.act.sws.push(sw);
   }
 
-  spawnDmgText(x, y, dmg, color = 0xff0000) {
+  spawnDmgText(x, y, dmg, color = 0xff0000, scale = 1.0) {
     if (this.pool.txts.length === 0) return;
     const t = this.pool.txts.pop();
     const str = Math.floor(dmg).toString();
+    t.customScale = scale;
 
     const minusTex = this.textures['digit_minus'];
     if (minusTex) {
@@ -142,7 +145,7 @@ export class VFXPool {
     t.maxL = CFG.VFX.DMG_TEXT.LIFE;
     t.visible = true;
     t.alpha = 1;
-    t.scale.set(0.1);
+    t.scale.set(0.1 * scale);
     this.act.txts.push(t);
   }
 
@@ -174,7 +177,7 @@ export class VFXPool {
       s.y += s.vy * tS;
 
       const normLife = s.life / s.maxL;
-      s.alpha = normLife < 0.1 ? 0.1 : normLife;
+      s.alpha = (normLife < 0.1 ? 0.1 : normLife) * (s.baseAlpha !== undefined ? s.baseAlpha : 1.0);
       if (s.sD) s.scale.set(normLife);
     }
   }
@@ -218,7 +221,7 @@ export class VFXPool {
 
       const progress = 1.0 - t.life / t.maxL;
       const st = Math.min(1.0, progress * 5.0);
-      const sA = 0.5 + Math.sin(st * Math.PI) * 0.3;
+      const sA = (0.5 + Math.sin(st * Math.PI) * 0.3) * (t.customScale || 1.0);
       t.scale.set(sA);
     }
   }

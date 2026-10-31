@@ -6,6 +6,7 @@ import { CFG } from '../config.js';
 import { FastMath } from './FastMath.js';
 import { AudioSys } from './AudioSys.js';
 import { VFXPool } from './VFXPool.js';
+import { BeamRenderer } from './BeamRenderer.js';
 import { MinitEngine } from './Registry.js';
 
 export class Arena extends PIXI.Container {
@@ -99,9 +100,10 @@ export class Arena extends PIXI.Container {
     this.fxO = new PIXI.Container();
     this.layer.addChild(this.fxO);
     this.fxPool = new VFXPool(this.fxU, this.fxO, this.textures);
+    this.beamRenderer = new BeamRenderer(this.layer, this.fxPool, this.textures);
 
     this.actE = [];
-    this.deadE = Array.from({ length: 300 }, () => ({
+    this.deadE = Array.from({ length: 600 }, () => ({
       active: false,
       dead: false,
       x: 0,
@@ -196,7 +198,7 @@ export class Arena extends PIXI.Container {
     const vfx = payload.hitVfx || {};
 
     if (!this.isHeadless) {
-      if (vfx.showText !== false) this.fxPool.spawnDmgText(pX, pY, dmg, fxC);
+      if (vfx.showText !== false) this.fxPool.spawnDmgText(pX, pY, dmg, fxC, vfx.textScale || 1.0);
       if (vfx.playSound !== false) AudioSys.play(vfx.sound || 'hit', 0.6);
     }
 
@@ -365,6 +367,9 @@ export class Arena extends PIXI.Container {
         if (tl) tl(e, this);
       }
       if (e.dead) {
+        if (e.p && e.p.beamId && this.beamRenderer) {
+          this.beamRenderer.removeBeam(e.p.beamId);
+        }
         this.actE[i] = this.actE[this.actE.length - 1];
         this.actE.pop();
         this.deadE.push(e);
@@ -402,6 +407,9 @@ export class Arena extends PIXI.Container {
     });
 
     this.fxPool.update(tS);
+    if (this.beamRenderer) {
+      this.beamRenderer.update(tS);
+    }
 
     if (this.fA > 0) {
       this.sF.alpha = this.fA;
@@ -422,5 +430,12 @@ export class Arena extends PIXI.Container {
     } else {
       this.view.position.set(0, 0);
     }
+  }
+
+  destroy(options) {
+    if (this.beamRenderer) {
+      this.beamRenderer.clear();
+    }
+    super.destroy(options);
   }
 }

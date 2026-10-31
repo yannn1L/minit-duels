@@ -439,4 +439,203 @@ export function registerTraitsAndTargeting() {
       }
     });
   });
+
+  // ============================================================
+  // UNIVERSAL MODULAR BEAM ATTACK TRAIT
+  // High-fidelity vector beam used by Laser, Murasaki, Ironman, etc.
+  // ============================================================
+  MinitEngine.Registry.addTrait('modularBeam', (e, a) => {
+    const owner = a.players.find((p) => p.id === e.p.ownerId);
+    if (!owner || owner.hp <= 0) {
+      if (e.p.beamId && a.beamRenderer) a.beamRenderer.removeBeam(e.p.beamId);
+      e.dead = true;
+      return;
+    }
+
+    if (!e.p.beamId) {
+      e.p.beamId = 'beam_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    const cfg = e.p.beamConfig || {};
+    const maxLife = e.maxL || 60;
+    const elapsed = maxLife - e.l;
+    const progress = Math.min(1.0, elapsed / maxLife);
+
+    // Determine target and angle
+    let target = null;
+    if (cfg.trackTarget) {
+      if (!e.p.targetId || !a.players.some((p) => p.id === e.p.targetId && p.hp > 0)) {
+        const closest = a.getValidTarget(owner.id, { type: 'closest_enemy' });
+        e.p.targetId = closest ? closest.id : null;
+      }
+      target = a.players.find((p) => p.id === e.p.targetId && p.hp > 0);
+      if (!target) {
+        if (a.beamRenderer) a.beamRenderer.removeBeam(e.p.beamId);
+        e.dead = true;
+        return;
+      }
+      e.p.aimAngle = Math.atan2(target.y - owner.y, target.x - owner.x);
+    } else {
+      if (e.p.aimAngle === undefined) {
+        const initialTgt = a.getValidTarget(owner.id, { type: 'closest_enemy' });
+        e.p.aimAngle = initialTgt ? Math.atan2(initialTgt.y - owner.y, initialTgt.x - owner.x) : 0;
+        e.p.targetId = initialTgt ? initialTgt.id : null;
+      }
+      target = a.players.find((p) => p.id === e.p.targetId && p.hp > 0);
+    }
+
+    const angle = e.p.aimAngle;
+    const startX = owner.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+    const startY = owner.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+
+    // Calculate end point
+    let endX, endY;
+    if (cfg.trackTarget && target) {
+      endX = target.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      endY = target.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+    } else {
+      const beamLength = cfg.beamLength || 460;
+      endX = startX + Math.cos(angle) * beamLength;
+      endY = startY + Math.sin(angle) * beamLength;
+    }
+
+    // Owner recoil pushback
+    if (cfg.recoilForce) {
+      owner.x -= Math.cos(angle) * cfg.recoilForce;
+      owner.y -= Math.sin(angle) * cfg.recoilForce;
+    }
+
+    // Render multi-layered glowing vector beam
+    if (a.beamRenderer) {
+      a.beamRenderer.renderBeam(e.p.beamId, {
+        startX,
+        startY,
+        endX,
+        endY,
+        coreColor: cfg.coreColor || 0xffffff,
+        glowColor: cfg.glowColor || e.p.color || 0x00e5ff,
+        sheathColor: cfg.sheathColor || null,
+        coreWidth: cfg.coreWidth || 4,
+        sheathWidth: cfg.sheathWidth || 12,
+        glowWidth: cfg.glowWidth || 24,
+        glowAlpha: cfg.glowAlpha || 0.35,
+        sheathAlpha: cfg.sheathAlpha || 0.85,
+        hasLightning: cfg.hasLightning !== false,
+        lightningColor: cfg.lightningColor || 0xffffff,
+        lightningBranches: cfg.lightningBranches || 2,
+        jitter: cfg.jitter || 0
+      });
+    }
+
+    // Muzzle particle emission
+    if (cfg.muzzleVfx !== false && e.l % 2 === 0) {
+      const mAng = angle + FastMath.randRange(-0.6, 0.6);
+      const mSpd = FastMath.randRange(1, 3.5);
+      a.fxPool.spawnPhysics(
+        cfg.sparkTex || 'fx_spark',
+        startX + Math.cos(angle) * 8,
+        startY + Math.sin(angle) * 8,
+        Math.cos(mAng) * mSpd,
+        Math.sin(mAng) * mSpd,
+        8,
+        0.85,
+        0.85,
+        true,
+        cfg.glowColor || e.p.color || 0x00e5ff
+      );
+    }
+
+    // Impact flare emission
+    if (cfg.impactVfx !== false && e.l % 2 === 0) {
+      for (let i = 0; i < 2; i++) {
+        const iAng = angle + Math.PI + FastMath.randRange(-1.2, 1.2);
+        const iSpd = FastMath.randRange(1.5, 4.5);
+        a.fxPool.spawnPhysics(
+          cfg.sparkTex || 'fx_spark',
+          endX,
+          endY,
+          Math.cos(iAng) * iSpd,
+          Math.sin(iAng) * iSpd,
+          10,
+          0.85,
+          0.85,
+          true,
+          cfg.glowColor || e.p.color || 0x00e5ff
+        );
+      }
+    }
+
+    // Damage & Collision application
+    const tickRate = cfg.tickRate || 5;
+    if (e.l % tickRate === 0) {
+      const dMult = owner.dmgMult || 1.0;
+      let calculatedDmg = cfg.damage || e.p.payload?.dmg || 10;
+      if (cfg.rampingDamage) {
+        calculatedDmg *= (1.0 + progress * cfg.rampingDamage);
+      }
+      const finalDmg = calculatedDmg * dMult;
+
+      if (cfg.trackTarget && target) {
+        // Direct tracking damage
+        a.damagePlayer(
+          target.id,
+          {
+            dmg: finalDmg,
+            hitVfx: {
+              shake: cfg.hitShake || 2,
+              flash: cfg.hitFlash || 0.08,
+              hitStop: cfg.hitStop || 1,
+              particleCount: cfg.hitParticles || 2,
+              particleTex: cfg.sparkTex,
+              playSound: false
+            }
+          },
+          cfg.glowColor || e.p.color
+        );
+        if (cfg.hitSound) AudioSys.play(cfg.hitSound, cfg.soundVolume || 0.3);
+      } else {
+        // Line collision against all enemies
+        const beamRadius = cfg.beamRadius || (cfg.sheathWidth ? cfg.sheathWidth * 1.2 : 22);
+        a.players.forEach((p) => {
+          if (p.id !== owner.id && p.hp > 0) {
+            const p_pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+            const p_pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+
+            const dist = Math.abs(Math.sin(angle) * (startX - p_pX) - Math.cos(angle) * (startY - p_pY));
+            const dot = Math.cos(angle) * (p_pX - startX) + Math.sin(angle) * (p_pY - startY);
+
+            if (dist <= beamRadius && dot > 0) {
+              const dmgPayload = {
+                dmg: finalDmg,
+                hitVfx: {
+                  shake: cfg.hitShake || 4,
+                  flash: cfg.hitFlash || 0.15,
+                  hitStop: cfg.hitStop || 1,
+                  particleCount: cfg.hitParticles || 3,
+                  particleTex: cfg.sparkTex,
+                  playSound: false
+                }
+              };
+
+              if (cfg.knockbackForce) {
+                dmgPayload.knockback = {
+                  forceX: Math.cos(angle) * cfg.knockbackForce,
+                  forceY: Math.sin(angle) * cfg.knockbackForce,
+                  shake: cfg.hitShake || 4
+                };
+              }
+
+              a.damagePlayer(p.id, dmgPayload, cfg.glowColor || e.p.color);
+              if (cfg.hitSound) AudioSys.play(cfg.hitSound, cfg.soundVolume || 0.3);
+            }
+          }
+        });
+      }
+    }
+
+    if (--e.l <= 0) {
+      if (a.beamRenderer) a.beamRenderer.removeBeam(e.p.beamId);
+      e.dead = true;
+    }
+  });
 }

@@ -22,12 +22,12 @@ export const MINIT_ABSORB = {
   },
 
   payload: {
-    zoneRadius: 4.3,       // Balanced radius (allows enemies with good movement to evade)
+    zoneRadius: 2.3,       // Balanced radius (allows enemies with good movement to evade)
     zoneDuration: 180,
     tickRate: 7,          // 4 ticks per second
     drain: {
       speed: 0.9,         // Gentle gravitational pull instead of paralyzing stun
-      hp: 4.5,             // Fair drain damage per tick
+      hp: 4.0,             // Fair drain damage per tick
       vfxLeech: 'fx_absorb_energy',
       hitVfx: { flash: 0.08, particleCount: 2, shake: 0, playSound: false }
     },
@@ -35,7 +35,7 @@ export const MINIT_ABSORB = {
       scale: 0.008,
       maxScale: 1.8,       // Balanced visual growth
       dmgMult: 0.03,
-      maxDmgMult: 10.0,     // Capped at 2.0x max multiplier (instead of 8x)
+      maxDmgMult: 9.0,     // Capped at 2.0x max multiplier (instead of 8x)
       sound: 'absorb_ding'
     }
   },

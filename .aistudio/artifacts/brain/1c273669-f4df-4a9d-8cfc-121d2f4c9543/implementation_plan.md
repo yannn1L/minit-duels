@@ -1,98 +1,146 @@
-# Developer Mode, Direct File Persistence & Headless Balancing Test (`/?dev`)
+# Modular Beam Attack VFX System (Laser, Gojo & Ironman)
 
-An advanced developer suite activated via `/?dev`, providing real-time stat editing with direct disk persistence to original source files, live texture hot-swapping, engine telemetry, and an automated headless round-robin combat simulator that runs exhaustive 1v1 matchups to output complete balance matrices and win-rate rankings.
+Upgrades the beam attacks of **Laser**, **Gojo (Murasaki)**, and **Ironman (Unibeam)** from rudimentary circle sprites into a high-performance, modular, multi-layered energy beam rendering system with realistic cores, glowing auras, crackling lightning arcs, muzzle charges, and impact flares.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following revisions have been incorporated per your request:
-> - **Direct File Persistence (No LocalStorage)**: Added a local Vite dev-server API endpoint (`/api/dev/save-minit`) so any stat or texture changes made in the developer panel are written directly to the physical source files (`src/minits/<id>.js`) on disk.
-> - **Headless Round-Robin Balancing Simulator**: Added an automated tournament engine that runs headless simulations (`tickLogic()` without GPU rendering) for all minit combinations (e.g., 20+ duels per pair, 400+ total matches in ~2 seconds).
-> - **Balancing Matrix & Analytics Review**: Displays an interactive win-rate matrix, average DPS, survival times, and tier rankings to instantly identify overpowered or underpowered minits.
+> The architectural and design choices confirmed during interactive clarification are locked in below:
+
+- **Confirmed Beam Rendering**: Multi-layered glowing vector beam (white-hot core + saturated inner sheath + wide outer aura glow).
+- **Confirmed VFX Elements**:
+  - Muzzle charge flare and corona at minit emitter position.
+  - Impact spark burst, shockwave, and ground scorch at target/beam termination.
+  - Procedural crackling lightning arcs dancing along the beam axis.
+  - Screen shake and dynamic hit-stop micro-pauses upon continuous contact.
+- **Confirmed Aiming Behaviors**:
+  - **Laser**: Dynamically tracks enemy movement throughout the beam duration.
+  - **Gojo & Ironman**: Fire in a locked vector direction calculated at firing inception, rewarding positioning and aim alignment.
+- **Confirmed Architecture**: Flexible, modular engine utility (`BeamRenderer.js` / `ModularBeamTrait`) usable by any present or future minit.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**:
-  - Activates when accessing `/?dev`.
-  - Floating collapsable developer console over the canvas with tabs for **Live Tuning**, **File Persistence**, and **Balance Simulator**.
-  - **Live File Saving**: Edits to HP, speed, cooldown, attack damages, and texture paths are written directly to disk into `src/minits/<id>.js`.
-  - **Headless Round-Robin Testing**: Simulates headless 1v1 battles across all 7 minits at uncapped CPU speed, compiling matchup matrices and win-rate analytics.
-- **Target Audience**: Developers, game balancers, and playtesters looking to balance characters with data-backed statistics and commit changes directly to the codebase.
+- **The Problem**: Currently, beam attacks spawn individual circular sprites (`fx_beam_core`, `fx_murasaki_beam`, `fx_unibeam_ray`) along a stepped line every frame, resembling separated beads or dots on a string rather than a continuous, cinematic laser beam.
+- **The Solution**: A dedicated, pooled `BeamRenderer` integrated into the rendering pipeline that draws crisp, continuous vector rays with:
+  1. An intensely bright core line (`0xffffff`).
+  2. A vibrant inner plasma sheath.
+  3. A wide translucent chromatic aura glow.
+  4. Real-time procedural lightning offsets.
+  5. Dynamic muzzle flares at the caster and explosive impact particle emitters at the collision terminus.
+- **Modularity & Reusability**: All beam parameters (colors, widths, tracking modes, jitter frequencies, lightning styles, knockback forces, audio triggers) are defined declaratively in minit payloads.
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. Visual Experience & Character Beam Specifications
 
-### Key User Flows
-
-1. **Accessing Developer Suite**: Navigating to `/?dev` renders a floating docked badge (`DEV SUITE · 60 FPS · 7 MINITS · [TEST BALANCE]`).
-2. **Stat Tuning & Direct File Saving**:
-   - Selecting a minit opens its live parameters: `HP`, `Speed`, `Action CD`, `Damages`, and `Texture Path`.
-   - Modifying a parameter updates the in-memory registry immediately for instant testing.
-   - Clicking **"Save Directly to File"** commits the changes to `src/minits/<id>.js` on disk.
-3. **Headless Round-Robin Balance Test**:
-   - Developer opens the **"Balance Simulator"** tab and selects match count per pairing (e.g. 10, 25, or 50 rounds).
-   - Clicking **"Run Round-Robin Simulation"** executes hundreds of battles headlessly within 1–2 seconds.
-   - The results view displays:
-     - **Win Rate Leaderboard**: Percentage rankings (e.g., #1 Ironman: 64%, #2 Laser: 52%...).
-     - **Matchup Matrix**: Full $7 \times 7$ grid showing head-to-head records (e.g., Laser vs Gojo, Moth vs Absorb).
-     - **Combat Metrics**: Average match duration (seconds) and average damage output.
-
-### Visual Styling
-
-- High-contrast, clean dark theme (`#0b0b14` with `#00e5ff` and `#242436` accents) with monospace tabular figures (`font-mono tabular-nums`).
-- Draggable or dockable floating window that collapses to minimize canvas obstruction.
-
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Vite Server Middleware for Direct Disk Writing**:
-  - *Chosen Approach*: Lightweight Vite middleware registered in `vite.config.ts` handling `POST /api/dev/save-minit`.
-  - *Why*: Enables client-side developer controls to persist changes straight into `src/minits/<id>.js` files on the user's filesystem without needing a separate backend server.
-  - *Safety*: Validates minit IDs against existing registry keys before writing to prevent accidental file corruption.
-- **Headless Pure Logic Simulation**:
-  - *Chosen Approach*: Instantiate a detached `Arena` without PIXI graphics/renderers, calling `arena.tickLogic()` in a tight loop until a player's HP reaches 0.
-  - *Why*: Eliminates 60 FPS rendering bottlenecks, allowing 500+ duels to simulate in less than 2 seconds.
-
----
-
-## 4. Technical Architecture & Component Structure
-
+### Visual Hierarchy & Layers
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       Browser Window                        │
+│                      BEAM ANATOMY                           │
 │                                                             │
-│  ┌────────────────────────┐      ┌───────────────────────┐  │
-│  │   Dev Console Overlay  │      │ PixiJS Canvas (#game) │  │
-│  │                        │      │                       │  │
-│  │  - Stat Sliders        │      │ - Active Simulation   │  │
-│  │  - Texture Switcher    │      │ - Character Editor    │  │
-│  │  - "Save to File" btn  │      └───────────────────────┘  │
-│  │  - Round-Robin Runner  │                  ▲              │
-│  │  - Win-Rate Matrix     │                  │ Reads live   │
-│  └───────────┬────────────┘                  │ stats        │
-│              │                               │              │
-│              │ POST /api/dev/save-minit      │              │
-│              ▼                               │              │
-│  ┌────────────────────────┐                  │              │
-│  │ Vite Dev Server Route  │                  │              │
-│  │ (vite.config.ts)       │                  │              │
-│  │ Writes src/minits/*.js │──────────────────┴──────────────┤
-│  └────────────────────────┘                                 │
+│  [Muzzle Flare]  ═══╦═════════════════════╦═══> [Impact FX] │
+│  (Corona Ring +     ║ Outer Aura (Alpha)  ║     (Sparks +   │
+│   Energy Swirl)     ║ Inner Sheath (Glow) ║      Shockwave  │
+│                     ╚═══════ Core ════════╝      + Scorch)  │
+│                        \    /     \                         │
+│                  Procedural Lightning Arcs                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Module Breakdown
+### Character-Specific Tunings
 
-1. **`vite.config.ts` (API Middleware)**:
-   - Registers `/api/dev/save-minit` to write updated stats, payloads, and action cooldowns directly into `src/minits/<id>.js`.
-2. **`src/dev/HeadlessSimulator.js`**:
-   - Executes round-robin tournament matches across all minits headlessly using `tickLogic()`.
-   - Aggregates wins, losses, average HP remaining, and match lengths.
-3. **`src/dev/DevConsole.js`**:
-   - Reactive UI with Stat Editors, Texture Path inputs, File Persistence buttons, and Tournament Matrix viewer.
-4. **`src/main.js`**:
-   - Boots `DevConsole` when `window.location.search.includes('dev')`.
+1. **Laser (Core Focus Beam)**:
+   - *Aura*: Electric Cyan (`0x00e5ff`, width 20px, alpha 0.35)
+   - *Sheath*: Bright Azure (`0x33f0ff`, width 8px, alpha 0.85)
+   - *Core*: Pure White (`0xffffff`, width 3px)
+   - *Aiming*: Smooth tracking toward target enemy with progressive damage ramp.
+   - *Accents*: Subtle high-frequency micro-jitter and focused target sizzle.
+
+2. **Gojo / Murasaki (Hollow Purple Cataclysm Beam)**:
+   - *Aura*: Deep Cursed Magenta/Violet (`0x9900ff`, width 36px, alpha 0.45)
+   - *Sheath*: Electric Purple (`0xcc33ff`, width 16px, alpha 0.9)
+   - *Core*: Blinding Super-White (`0xffffff`, width 6px)
+   - *Aiming*: Fixed firing angle locked upon Red & Blue singularity fusion.
+   - *Accents*: Violent crackling purple/white lightning branches, full-arena recoil kick, screen rumble, and line-slice destruction.
+
+3. **Ironman (Unibeam Chest Laser)**:
+   - *Aura*: Arc-Reactor Cyan/Sky Blue (`0x00d4ff`, width 28px, alpha 0.4)
+   - *Sheath*: Energy Blue (`0x00ffff`, width 12px, alpha 0.85)
+   - *Core*: Pure White (`0xffffff`, width 5px)
+   - *Aiming*: Fixed trajectory locked after chest charging sequence.
+   - *Accents*: Expanding supersonic shock rings, continuous backwards thruster recoil, directional knockback impulse pushing targets along beam vector.
+
+---
+
+## 3. Technical Architecture & Implementation Details
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                          SYSTEM FLOW                             │
+│                                                                  │
+│  Minit Definition (laser.js / murasaki.js / ironmen.js)          │
+│         │                                                        │
+│         ▼                                                        │
+│  Arena.spawnEnt({ traits: ['modularBeam'], p: { beamConfig } })  │
+│         │                                                        │
+│         ├─► Logic Tick (Arena.tickLogic)                         │
+│         │     • Line-segment collision & damage ticks            │
+│         │     • Directional knockback & target tracking          │
+│         │                                                        │
+│         └─► Render Pass (Arena.updateVisuals -> BeamRenderer)    │
+│               • Pooled PIXI.Graphics batch render                │
+│               • Multi-layer stroke rendering (Glow/Sheath/Core)  │
+│               • Procedural lightning generation (FastMath)       │
+│               • Muzzle flare & Impact particle bursts            │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Core Components to Build & Update
+
+1. **`src/engine/BeamRenderer.js` (New Modular Engine Utility)**:
+   - Manages pooled `PIXI.Graphics` instances inside `Arena.layer` for zero-allocation beam rendering.
+   - Implements `drawBeam(graphics, startPoint, endPoint, config, time)`:
+     - Outer glow: `.lineStyle(glowWidth, glowColor, glowAlpha)`.
+     - Inner sheath: `.lineStyle(sheathWidth, sheathColor, sheathAlpha)`.
+     - Center core: `.lineStyle(coreWidth, coreColor, 1.0)`.
+     - Lightning arcs: Computes midpoint displacements along the normal vector using seeded FastMath noise.
+     - Terminal caps: Smooth rounded or tapered endpoints with muzzle/impact halos.
+   - Provides clean cleanup and pool recycle when beam lifecycle ends.
+
+2. **`src/engine/traitBeh.js` (Modular Beam Trait & Physics)**:
+   - Registers `'modularBeam'` trait handling:
+     - Dynamic tracking vs. static vector locking.
+     - Accurate capsule/segment intersection testing with enemy hitboxes.
+     - Damage application with configurable tick rates, screen shake, and hit-stop micro pauses.
+     - Directional knockback applied along the beam normal or forward vector.
+     - Emitter of muzzle flash and impact particles via `VFXPool`.
+
+3. **`src/minits/laser.js` Refactoring**:
+   - Replaces circle particle loop with the new `'modularBeam'` trait.
+   - Sets continuous tracking, cyan palette, and escalating damage profile.
+
+4. **`src/minits/murasaki.js` Refactoring**:
+   - Updates Phase 3 of `hollowPurpleSequence` to use the modular beam system.
+   - Retains Red & Blue orb fusion ritual, then erupts into the high-width violet beam with lightning branches.
+
+5. **`src/minits/ironmen.js` Refactoring**:
+   - Updates Ability 3 (`ironUnibeamBlast`) to leverage the modular beam system.
+   - Applies directional knockback and recoil thruster effects while firing the unibeam.
+
+6. **Dev Console Integration (`src/dev/DevConsole.js`)**:
+   - Ensures beam attributes (damage, tick rate, width, colors) remain fully inspectable and live-editable in `/?dev` mode.
+
+---
+
+## 4. Verification & Testing Plan
+
+1. **Static Build & Compilation**:
+   - Run `compile_applet` to verify TypeScript/ESModule syntax and clean imports.
+   - Run `npm run build` to ensure the production bundle builds without overhead.
+2. **Visual & Performance Inspection**:
+   - Test Laser in match preview: Verify smooth continuous tracking, lack of beaded "circle" artifacts, and bright luminous beam core.
+   - Test Gojo: Verify Red/Blue orb charge -> fusion flash -> massive purple beam with lightning arcs.
+   - Test Ironman: Verify Arc Reactor chest charging -> firing Unibeam with heavy enemy knockback and thruster recoil.
+   - Verify 60 FPS performance with zero frame drops or memory leaks from graphics pooling.

@@ -68,6 +68,21 @@ function devMinitSaverPlugin(): Plugin {
               if (payload.dmg !== undefined) {
                 fileContent = fileContent.replace(/(dmg:\s*)\d+(\.\d+)?/g, `$1${payload.dmg}`);
               }
+              if (payload.initialDmg !== undefined) {
+                fileContent = fileContent.replace(/(initialDmg:\s*)\d+(\.\d+)?/g, `$1${payload.initialDmg}`);
+              }
+              if (payload.electricTickDmg !== undefined) {
+                fileContent = fileContent.replace(/(electricTickDmg:\s*)\d+(\.\d+)?/g, `$1${payload.electricTickDmg}`);
+              }
+              if (payload.barrageDmg !== undefined) {
+                fileContent = fileContent.replace(/(barrageDmg:\s*)\d+(\.\d+)?/g, `$1${payload.barrageDmg}`);
+              }
+              if (payload.seriousDmg !== undefined) {
+                fileContent = fileContent.replace(/(seriousDmg:\s*)\d+(\.\d+)?/g, `$1${payload.seriousDmg}`);
+              }
+              if (payload.deathDmg !== undefined) {
+                fileContent = fileContent.replace(/(deathDmg:\s*)\d+(\.\d+)?/g, `$1${payload.deathDmg}`);
+              }
               if (payload.missileDmg !== undefined) {
                 fileContent = fileContent.replace(/(missileDmg:\s*)\d+(\.\d+)?/g, `$1${payload.missileDmg}`);
               }

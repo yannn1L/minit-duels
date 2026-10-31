@@ -556,64 +556,98 @@ export const MINIT_IRONMEN = {
         owner.aS.tX = 1.1 + Math.sin(elapsed * 0.4) * 0.12;
         owner.aS.tY = 1.1 + Math.sin(elapsed * 0.4) * 0.12;
       }
-      // PHASE 2: UNIBEAM FIRING (20 - 65 frames)
+      // PHASE 2: UNIBEAM REAL VECTOR FIRING (20 - 65 frames)
       else {
         if (elapsed === 20) {
           AudioSys.play('iron_unibeam_fire');
           a.triggerFlash(0.5);
-          a.hitStop = 3;
-          a.shake = Math.max(a.shake, 6);
+          a.hitStop = 4;
+          a.shake = Math.max(a.shake, 8);
+          e.p.beamId = 'iron_unibeam_' + e.p.ownerId;
+          // Locked firing trajectory as confirmed by user
+          e.p.fixedAngle = angle;
         }
 
+        const fireAngle = e.p.fixedAngle !== undefined ? e.p.fixedAngle : angle;
+
         // Recoil pushback on Iron Man
-        owner.x -= Math.cos(angle) * 0.02;
-        owner.y -= Math.sin(angle) * 0.02;
+        owner.x -= Math.cos(fireAngle) * 0.03;
+        owner.y -= Math.sin(fireAngle) * 0.03;
         owner.aS.tX = 1.35;
         owner.aS.tY = 0.85;
 
-        // Concentrated Unibeam Ray (18 points spaced 24px apart)
-        const beamSteps = 18;
-        const stepDist = 24;
-        for (let i = 1; i <= beamSteps; i++) {
-          const bx = pX + Math.cos(angle) * (i * stepDist);
-          const by = pY + Math.sin(angle) * (i * stepDist);
+        // Render high-intensity Arc Reactor Unibeam
+        const beamLength = 480;
+        const endX = pX + Math.cos(fireAngle) * beamLength;
+        const endY = pY + Math.sin(fireAngle) * beamLength;
 
-          a.fxPool.spawnPhysics('fx_unibeam_ray', bx, by, 0, 0, 2, 1, 1, false, 0xffffff);
-
-          // Energy rings travelling down beam
-          if (i % 5 === 0 && e.l % 3 === 0) {
-            a.fxPool.spawnPhysics('fx_unibeam_ring', bx, by, 0, 0, 3, 1, 1, true, 0x00ffff);
-          }
+        if (a.beamRenderer) {
+          a.beamRenderer.renderBeam(e.p.beamId, {
+            startX: pX,
+            startY: pY,
+            endX,
+            endY,
+            coreColor: 0xffffff,
+            sheathColor: 0x00ffff,
+            glowColor: 0x0099ff,
+            coreWidth: 5,
+            sheathWidth: 14,
+            glowWidth: 30,
+            glowAlpha: 0.42,
+            sheathAlpha: 0.85,
+            hasLightning: true,
+            lightningColor: 0x88ffff,
+            lightningBranches: 2,
+            jitter: 1.0
+          });
         }
 
-        // Ray collision and damage resolution
+        // Energy pulses & thruster sparks
+        if (e.l % 3 === 0) {
+          const sparkDist = FastMath.randRange(30, beamLength * 0.8);
+          a.fxPool.spawnPhysics(
+            'fx_unibeam_spark',
+            pX + Math.cos(fireAngle) * sparkDist,
+            pY + Math.sin(fireAngle) * sparkDist,
+            FastMath.randRange(-1.5, 1.5),
+            FastMath.randRange(-1.5, 1.5),
+            6,
+            0.9,
+            0.9,
+            true,
+            0x00ffff
+          );
+        }
+
+        // Ray collision and directional knockback
         if (e.l % 4 === 0) {
           AudioSys.play('iron_unibeam_sizzle');
+          const dMult = owner.dmgMult || 1.0;
           a.players.forEach((p) => {
             if (p.id !== owner.id && p.hp > 0) {
               const p_pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
               const p_pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
 
-              const dist = Math.abs(Math.sin(angle) * (pX - p_pX) - Math.cos(angle) * (pY - p_pY));
-              const dot = Math.cos(angle) * (p_pX - pX) + Math.sin(angle) * (p_pY - pY);
+              const dist = Math.abs(Math.sin(fireAngle) * (pX - p_pX) - Math.cos(fireAngle) * (pY - p_pY));
+              const dot = Math.cos(fireAngle) * (p_pX - pX) + Math.sin(fireAngle) * (p_pY - pY);
 
-              if (dist <= 22 && dot > 0) {
+              if (dist <= 26 && dot > 0) {
                 a.damagePlayer(
                   p.id,
                   {
-                    dmg: e.p.payload.beamTickDmg,
+                    dmg: (e.p.payload.beamTickDmg || 13) * dMult,
                     hitVfx: {
-                      shake: 3,
-                      flash: 0.12,
-                      particleCount: 3,
+                      shake: 4,
+                      flash: 0.15,
+                      particleCount: 4,
                       particleTex: 'fx_unibeam_spark',
                       hitStop: 1,
                       playSound: false
                     },
                     knockback: {
-                      forceX: Math.cos(angle) * 0.35,
-                      forceY: Math.sin(angle) * 0.35,
-                      shake: 4
+                      forceX: Math.cos(fireAngle) * (e.p.payload.knockbackForce || 0.65),
+                      forceY: Math.sin(fireAngle) * (e.p.payload.knockbackForce || 0.65),
+                      shake: 6
                     }
                   },
                   0x00e5ff
@@ -624,7 +658,10 @@ export const MINIT_IRONMEN = {
         }
       }
 
-      if (--e.l <= 0) e.dead = true;
+      if (--e.l <= 0) {
+        if (e.p.beamId && a.beamRenderer) a.beamRenderer.removeBeam(e.p.beamId);
+        e.dead = true;
+      }
     }
   }
 };
