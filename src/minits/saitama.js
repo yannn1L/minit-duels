@@ -1,5 +1,5 @@
 // ============================================================
-// MINIT: SAITAMA (ES Module - One Punch Man)
+// MINIT: SAITAMA (ES Module - One Punch Man - Enhanced VFX/SFX)
 // Ability 1: Consecutive Normal Punches (Renzoku Futsū no Panchi)
 // Ability 2: Serious Punch (Maji Naguri) with Atmospheric Shock Cannon
 // Ability 3: DEATH PUNCH (Dramatic Giant Fist Expansion -> 9999 DMG!)
@@ -17,10 +17,10 @@ export const MINIT_SAITAMA = {
   targeting: { type: 'closest_enemy' },
 
   deathVfx: {
-    shake: 14,
-    flash: 0.8,
-    particleCount: 30,
-    shockRad: 160,
+    shake: 18,
+    flash: 0.85,
+    particleCount: 38,
+    shockRad: 175,
     sound: 'explosion',
     hitStop: 14
   },
@@ -45,50 +45,83 @@ export const MINIT_SAITAMA = {
   },
 
   customTextures: {
-    // Red Hero Boxing Glove / Clenched Fist Sprite
+    // Red Hero Boxing Glove / Clenched Fist Sprite with Golden Aura Cuff
     fx_saitama_fist: (g) => {
+      // Outer crimson speed-aura
+      g.beginFill(0xff2200, 0.35).drawRoundedRect(-8, -6, 16, 12, 4);
+      // Golden hero glove cuff
+      g.beginFill(0xffd700, 0.95).drawRect(-7, -3.5, 3, 7);
       // Red glove body
-      g.beginFill(0xcc1111).drawRoundedRect(-6, -4, 12, 8, 2);
-      // Thumb knuckle
-      g.beginFill(0xee2222).drawCircle(-2, -3, 3);
-      // Knuckle highlight
-      g.beginFill(0xffffff, 0.85).drawRect(2, -2, 2, 4);
+      g.beginFill(0xcc1111, 1.0).drawRoundedRect(-5, -4.5, 12, 9, 2.5);
+      // Thumb & knuckle ridge
+      g.beginFill(0xff2222, 1.0).drawCircle(-1, -3, 3);
+      // Specular knuckle highlight
+      g.beginFill(0xffffff, 0.95).drawRect(3, -3, 2.5, 5);
       g.endFill();
     },
 
-    // Dramatic Giant Death Fist (Ability 3)
+    // Dramatic Giant Death Fist (Ability 3 - Colossal Multi-Layered Glove)
     fx_saitama_giant_fist: (g) => {
-      // Outer destructive red aura
-      g.beginFill(0xff0033, 0.4).drawRoundedRect(-24, -18, 48, 36, 8);
-      // Red glove body
-      g.beginFill(0xd41414, 0.98).drawRoundedRect(-20, -15, 40, 30, 6);
+      // Apocalyptic outer crimson-gold shock corona
+      g.beginFill(0xff0022, 0.28).drawRoundedRect(-28, -22, 56, 44, 10);
+      g.lineStyle(2, 0xffd700, 0.75).drawRoundedRect(-25, -19, 50, 38, 8);
+      // Deep crimson shadow layer
+      g.lineStyle(0).beginFill(0x880000, 0.95).drawRoundedRect(-22, -16, 44, 32, 7);
+      // Iconic Red Hero Glove body
+      g.beginFill(0xd81414, 1.0).drawRoundedRect(-20, -15, 40, 30, 6);
       // Thumb knuckle
-      g.beginFill(0xff2222, 1.0).drawCircle(-10, -10, 8);
-      // Knuckle highlight ridges
-      g.beginFill(0xffffff, 0.9).drawRect(6, -10, 5, 20);
-      g.beginFill(0xff6666, 0.9).drawRect(-4, -10, 5, 20);
+      g.beginFill(0xff2a2a, 1.0).drawCircle(-9, -10, 8.5);
+      // White-hot impact knuckle ridges
+      g.beginFill(0xffffff, 0.95).drawRoundedRect(6, -11, 6, 22, 2);
+      g.beginFill(0xff7777, 0.9).drawRoundedRect(-3, -10, 5, 20, 2);
       g.endFill();
+    },
+
+    // Menacing "DEATH" (死) Kanji / Crimson Doom Sigil
+    fx_saitama_death_sigil: (g) => {
+      g.beginFill(0xff0022, 0.22).drawCircle(0, 0, 22).endFill();
+      g.lineStyle(2.5, 0xff0033, 0.95)
+        .moveTo(-12, -10).lineTo(12, -10)
+        .moveTo(-2, -10).lineTo(-9, 8)
+        .moveTo(-7, -2).lineTo(2, -2).lineTo(-3, 10)
+        .moveTo(4, -8).lineTo(4, 9).lineTo(12, 9)
+        .moveTo(11, -3).lineTo(4, 2);
+      g.lineStyle(1, 0xffffff, 0.85)
+        .moveTo(-10, -10).lineTo(10, -10);
     },
 
     // Menacing atmospheric pressure ring
     fx_saitama_pressure_ring: (g) => {
-      g.lineStyle(3, 0xff0033, 0.9).drawCircle(0, 0, 28);
-      g.lineStyle(1.5, 0xffea00, 1.0).drawCircle(0, 0, 20);
-      g.beginFill(0xff0000, 0.2).drawCircle(0, 0, 28).endFill();
+      g.lineStyle(3, 0xff0033, 0.92).drawCircle(0, 0, 28);
+      g.lineStyle(1.8, 0xffea00, 1.0).drawCircle(0, 0, 21);
+      g.lineStyle(1, 0xffffff, 0.8).drawCircle(0, 0, 15);
+      g.beginFill(0xff0000, 0.16).drawCircle(0, 0, 28).endFill();
+    },
+
+    // Supersonic Mach Vapor Cone
+    fx_saitama_sonic_cone: (g) => {
+      g.lineStyle(2.5, 0xffffff, 0.9)
+        .moveTo(8, 0)
+        .lineTo(-10, -14)
+        .moveTo(8, 0)
+        .lineTo(-10, 14);
+      g.lineStyle(1.5, 0xffdd00, 0.75)
+        .arc(0, 0, 10, -1.1, 1.1);
     },
 
     // High-speed fist ghost trail / wind streak
     fx_saitama_whoosh: (g) => {
-      g.beginFill(0xffffff, 0.7).drawPolygon([-8, -2, 8, 0, -8, 2]);
-      g.beginFill(0xffdd00, 0.5).drawPolygon([-12, -3, 4, 0, -12, 3]);
+      g.beginFill(0xffffff, 0.85).drawPolygon([-10, -2, 10, 0, -10, 2]);
+      g.beginFill(0xffdd00, 0.65).drawPolygon([-14, -3.5, 5, 0, -14, 3.5]);
       g.endFill();
     },
 
     // Serious Red Eye Glint
     fx_saitama_serious_eye: (g) => {
-      g.lineStyle(2, 0xff0033, 1).moveTo(-6, 0).lineTo(6, 0);
-      g.lineStyle(1, 0xffffff, 1).moveTo(0, -4).lineTo(0, 4);
-      g.beginFill(0xff2222).drawCircle(0, 0, 2).endFill();
+      g.lineStyle(2.5, 0xff0033, 1).moveTo(-8, 0).lineTo(8, 0);
+      g.lineStyle(1.5, 0xffffff, 1).moveTo(0, -6).lineTo(0, 6);
+      g.beginFill(0xff2222, 1).drawCircle(0, 0, 3).endFill();
+      g.beginFill(0xffffff, 1).drawCircle(0, 0, 1.5).endFill();
     },
 
     // Serious Punch Atmospheric Shockwave Blast
@@ -96,86 +129,136 @@ export const MINIT_SAITAMA = {
       g.lineStyle(3, 0xffffff, 1.0)
         .moveTo(-10, 0)
         .lineTo(30, -22)
-        .lineTo(38, 0)
+        .lineTo(40, 0)
         .lineTo(30, 22)
         .closePath();
-      g.beginFill(0xffdd00, 0.35)
+      g.lineStyle(1.5, 0xff0033, 0.9)
+        .moveTo(-6, 0)
+        .lineTo(26, -16)
+        .lineTo(34, 0)
+        .lineTo(26, 16);
+      g.beginFill(0xffdd00, 0.38)
         .moveTo(-8, 0)
         .lineTo(26, -18)
-        .lineTo(32, 0)
+        .lineTo(34, 0)
         .lineTo(26, 18)
         .closePath()
         .endFill();
     },
 
-    // Ground Dust & Debris
+    // Crimson-Gold Conqueror Ki Lightning Bolt
+    fx_saitama_lightning: (g) => {
+      g.lineStyle(2.5, 0xff0033, 1.0)
+        .moveTo(-10, -12)
+        .lineTo(-2, -3)
+        .lineTo(-6, 2)
+        .lineTo(5, 7)
+        .lineTo(10, 13);
+      g.lineStyle(1.2, 0xffea00, 0.95)
+        .moveTo(-10, -12)
+        .lineTo(-2, -3)
+        .lineTo(5, 7);
+    },
+
+    // Ground Dust & Tectonic Debris
     fx_saitama_dust: (g) => {
-      g.beginFill(0xd8cca8, 0.8).drawCircle(0, 0, 3);
-      g.beginFill(0xffeeaa, 0.6).drawCircle(1, -1, 1.5);
+      g.beginFill(0xc8b890, 0.85).drawCircle(0, 0, 3.5);
+      g.beginFill(0xffeeaa, 0.75).drawCircle(1, -1, 1.8);
       g.endFill();
     },
 
-    // Punch Impact Sparkle
+    // Blazing 4-Point Impact Star Spark
     fx_saitama_spark: (g) => {
-      g.beginFill(0xffea00).drawRect(-1.5, -1.5, 3, 3).endFill();
+      g.beginFill(0xff2200, 0.6).drawCircle(0, 0, 4).endFill();
+      g.beginFill(0xffea00, 1.0)
+        .drawPolygon([-5, 0, 0, -1.5, 5, 0, 0, 1.5])
+        .drawPolygon([0, -5, 1.5, 0, 0, 5, -1.5, 0])
+        .endFill();
+      g.beginFill(0xffffff, 1.0).drawRect(-1, -1, 2, 2).endFill();
     }
   },
 
   customAudio: {
+    // Heavy anime body-blow punch impact
     saitama_punch_hit: {
       t: 'sawtooth',
-      f0: 320,
-      f1: 50,
-      v: 0.16,
-      d: 0.08,
+      f0: () => 340 + Math.random() * 140,
+      f1: 42,
+      v: 0.18,
+      d: 0.085,
       ramp: 'exp',
-      throttle: 0.03
+      throttle: 0.025
     },
+    // Crisp supersonic fist air-whip
     saitama_whoosh: {
-      t: 'sine',
-      f0: 550,
-      f1: 180,
-      v: 0.14,
-      d: 0.1,
+      t: 'triangle',
+      f0: () => 580 + Math.random() * 180,
+      f1: 140,
+      v: 0.15,
+      d: 0.09,
       ramp: 'exp',
-      throttle: 0.04
+      throttle: 0.035
     },
+    // Deep anime tension charge
     saitama_serious_charge: {
       t: 'sawtooth',
-      f0: 80,
-      f1: 450,
+      f0: 65,
+      f1: 520,
       v: 0.28,
       d: 0.45,
       ramp: 'exp'
     },
+    // Earth-shattering Serious Punch shock cannon
     saitama_serious_boom: {
       noise: true,
-      d: 0.65,
+      d: 0.68,
       fType: 'lowpass',
-      f0: 1800,
-      f1: 40,
-      v: 0.65,
-      oF0: 300,
-      oF1: 25,
+      f0: 1950,
+      f1: 36,
+      v: 0.68,
+      oF0: 320,
+      oF1: 22,
       throttle: 0.1
     },
+    // Apocalyptic Death Punch pressure riser
     saitama_death_charge: {
       t: 'sawtooth',
-      f0: 45,
-      f1: 550,
-      v: 0.35,
+      f0: 42,
+      f1: 620,
+      v: 0.36,
       d: 1.2,
       ramp: 'exp'
     },
+    // Ominous tectonic heartbeat pulse during Giant Fist expansion
+    saitama_heartbeat: {
+      t: 'triangle',
+      f0: 110,
+      f1: 28,
+      v: 0.24,
+      d: 0.12,
+      ramp: 'exp',
+      throttle: 0.08
+    },
+    // Cataclysmic 9999 Death Slam detonation
     saitama_death_slam: {
       noise: true,
-      d: 0.9,
+      d: 0.95,
       fType: 'lowpass',
-      f0: 2400,
-      f1: 30,
-      v: 0.85,
-      oF0: 380,
-      oF1: 20,
+      f0: 2600,
+      f1: 26,
+      v: 0.88,
+      oF0: 410,
+      oF1: 18,
+      throttle: 0.1
+    },
+    // Harmonic metallic shockwave resonance on 9999 impact
+    saitama_aftershock: {
+      t: 'sawtooth',
+      f0: 220,
+      f1: 32,
+      v: 0.32,
+      d: 0.65,
+      ramp: 'exp',
       throttle: 0.1
     }
   },
@@ -267,8 +350,44 @@ export const MINIT_SAITAMA = {
       owner.aS.tX = 1.3 + Math.sin(elapsed * 1.5) * 0.15;
       owner.aS.tY = 0.85 + Math.cos(elapsed * 1.5) * 0.15;
 
+      const oPX = owner.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      const oPY = owner.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+
+      // Ground dust kickback behind Saitama's feet during barrage
+      if (e.l % 4 === 0) {
+        a.fxPool.spawnPhysics(
+          'fx_saitama_dust',
+          oPX - Math.cos(angle) * 8,
+          oPY - Math.sin(angle) * 8,
+          -Math.cos(angle) * 2.2 + FastMath.randRange(-0.8, 0.8),
+          -Math.sin(angle) * 2.2 + FastMath.randRange(-0.8, 0.8),
+          10,
+          0.88,
+          0.88,
+          true,
+          0xd8cca8
+        );
+      }
+
       if (e.l % 3 === 0) {
-        AudioSys.play('saitama_whoosh', 0.2);
+        AudioSys.play('saitama_whoosh', 0.25);
+
+        // Supersonic vapor ring at punch origin every 6 frames
+        if (e.l % 6 === 0) {
+          a.fxPool.spawnPhysics(
+            'fx_saitama_sonic_cone',
+            oPX + Math.cos(angle) * 10,
+            oPY + Math.sin(angle) * 10,
+            Math.cos(angle) * 1.5,
+            Math.sin(angle) * 1.5,
+            6,
+            0.85,
+            0.85,
+            true,
+            0xffffff,
+            0.75
+          );
+        }
 
         const punchSpread = FastMath.randRange(-0.35, 0.35);
         const punchAngle = angle + punchSpread;
@@ -295,9 +414,9 @@ export const MINIT_SAITAMA = {
               zoneRadius: 1.4,
               destroyOnHit: true,
               hitVfx: {
-                shake: 3,
-                flash: 0.1,
-                particleCount: 3,
+                shake: 3.5,
+                flash: 0.12,
+                particleCount: 5,
                 particleTex: 'fx_saitama_spark',
                 sound: 'saitama_punch_hit',
                 playSound: true,
@@ -326,7 +445,7 @@ export const MINIT_SAITAMA = {
 
       a.fxPool.spawnPhysics('fx_saitama_fist', pX, pY, 0, 0, 2, 1, 1, false, 0xffffff);
       if (e.l % 2 === 0) {
-        a.fxPool.spawnPhysics('fx_saitama_whoosh', pX, pY, -e.dx * 1.5, -e.dy * 1.5, 4, 0.85, 0.85, true, 0xffffff);
+        a.fxPool.spawnPhysics('fx_saitama_whoosh', pX, pY, -e.dx * 1.6, -e.dy * 1.6, 5, 0.85, 0.85, true, 0xffffff);
       }
     },
 
@@ -355,24 +474,41 @@ export const MINIT_SAITAMA = {
       if (elapsed < 24) {
         if (elapsed === 0) {
           AudioSys.play('saitama_serious_charge');
+          a.fxPool.spawnShockwave(pX, pY, 0xff0033, 55, 3);
         }
 
         owner.dx = 0;
         owner.dy = 0;
-        owner.aS.tX = 1.25;
-        owner.aS.tY = 0.75;
+        owner.aS.tX = 1.28;
+        owner.aS.tY = 0.72;
 
         a.fxPool.spawnPhysics('fx_saitama_serious_eye', pX, pY - 4, 0, 0, 2, 1, 1, false, 0xff0033);
 
+        // Crackling crimson-gold ki lightning during Serious charge
+        if (e.l % 3 === 0) {
+          a.fxPool.spawnPhysics(
+            'fx_saitama_lightning',
+            pX + FastMath.randRange(-12, 12),
+            pY + FastMath.randRange(-12, 12),
+            0,
+            -1.2,
+            5,
+            0.9,
+            0.9,
+            true,
+            0xffd700
+          );
+        }
+
         if (e.l % 2 === 0) {
           const spkAng = FastMath.rand() * 6.28;
-          const dist = FastMath.randRange(16, 28);
+          const dist = FastMath.randRange(18, 32);
           a.fxPool.spawnPhysics(
             'fx_saitama_dust',
             pX + Math.cos(spkAng) * dist,
             pY + Math.sin(spkAng) * dist,
-            -Math.cos(spkAng) * 2.2,
-            -Math.sin(spkAng) * 2.2,
+            -Math.cos(spkAng) * 2.5,
+            -Math.sin(spkAng) * 2.5,
             8,
             0.9,
             0.9,
@@ -381,7 +517,7 @@ export const MINIT_SAITAMA = {
           );
         }
 
-        a.shake = Math.max(a.shake, 2);
+        a.shake = Math.max(a.shake, 2.5);
       }
       // PHASE 2: Supersonic Dash & Serious Punch (Frame 24)
       else if (elapsed === 24) {
@@ -391,21 +527,32 @@ export const MINIT_SAITAMA = {
         a.shake = Math.max(a.shake, 24);
 
         const dashDistance = Math.min(FastMath.dist(owner.x, owner.y, tgt.x, tgt.y) - 0.7, 4.0);
-        owner.x += Math.cos(angle) * Math.max(0.5, dashDistance);
-        owner.y += Math.sin(angle) * Math.max(0.5, dashDistance);
+        const actualDash = Math.max(0.5, dashDistance);
+
+        // Spawn sonic cones along dash trajectory
+        for (let s = 0; s < 3; s++) {
+          const stepRatio = s / 3;
+          const trailX = (owner.x + Math.cos(angle) * actualDash * stepRatio) * CFG.GRID.TS + CFG.GRID.HALF_TS;
+          const trailY = (owner.y + Math.sin(angle) * actualDash * stepRatio) * CFG.GRID.TS + CFG.GRID.HALF_TS;
+          a.fxPool.spawnPhysics('fx_saitama_sonic_cone', trailX, trailY, 0, 0, 10, 1, 1, true, 0xffffff);
+        }
+
+        owner.x += Math.cos(angle) * actualDash;
+        owner.y += Math.sin(angle) * actualDash;
 
         const newPX = owner.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
         const newPY = owner.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
 
-        owner.aS.tX = 1.8;
-        owner.aS.tY = 0.65;
+        owner.aS.tX = 1.85;
+        owner.aS.tY = 0.62;
 
-        a.fxPool.spawnShockwave(newPX, newPY, 0xffd700, 160, 8);
-        a.fxPool.spawnShockwave(newPX, newPY, 0xffffff, 90, 4);
+        a.fxPool.spawnShockwave(newPX, newPY, 0xffd700, 170, 8);
+        a.fxPool.spawnShockwave(newPX, newPY, 0xff0033, 130, 5);
+        a.fxPool.spawnShockwave(newPX, newPY, 0xffffff, 95, 4);
 
         for (let i = 0; i < 18; i++) {
           const coneAngle = angle + FastMath.randRange(-0.45, 0.45);
-          const spd = FastMath.randRange(4.0, 9.5);
+          const spd = FastMath.randRange(4.2, 9.8);
           a.fxPool.spawnPhysics(
             'fx_saitama_serious_shock',
             newPX + Math.cos(coneAngle) * 20,
@@ -422,7 +569,7 @@ export const MINIT_SAITAMA = {
 
         for (let i = 0; i < 22; i++) {
           const dAng = angle + FastMath.randRange(-0.8, 0.8);
-          const dSpd = FastMath.randRange(3.0, 8.0);
+          const dSpd = FastMath.randRange(3.0, 8.5);
           a.fxPool.spawnPhysics(
             'fx_saitama_dust',
             newPX,
@@ -447,7 +594,7 @@ export const MINIT_SAITAMA = {
             hitVfx: {
               shake: 24,
               flash: 0.8,
-              particleCount: 16,
+              particleCount: 18,
               particleTex: 'fx_saitama_spark',
               hitStop: 6,
               playSound: false
@@ -508,16 +655,38 @@ export const MINIT_SAITAMA = {
       if (elapsed < 58) {
         if (elapsed === 0) {
           AudioSys.play('saitama_death_charge');
+          a.fxPool.spawnShockwave(ownerPX, ownerPY, 0xff0033, 95, 4);
         }
 
         const growProgress = elapsed / 58; // 0.0 -> 1.0
-        const fistY = targetPY - (1.0 - growProgress) * 20;
+        const fistY = targetPY - (1.0 - growProgress) * 22;
 
-        // Red serious eye glint on Saitama
+        // Ominous tectonic heartbeat pulse every 14 frames
+        if (elapsed > 0 && elapsed % 14 === 0) {
+          AudioSys.play('saitama_heartbeat');
+          a.fxPool.spawnShockwave(targetPX, targetPY, 0xff0033, 55 + growProgress * 65, 3);
+        }
+
+        // Red serious eye glint & Death Sigil on Saitama
         a.fxPool.spawnPhysics('fx_saitama_serious_eye', ownerPX, ownerPY - 4, 0, 0, 2, 1, 1, false, 0xff0033);
+        if (e.l % 3 === 0) {
+          a.fxPool.spawnPhysics(
+            'fx_saitama_death_sigil',
+            targetPX,
+            targetPY - 26,
+            0,
+            0,
+            3,
+            1,
+            1,
+            false,
+            0xff0033,
+            0.5 + growProgress * 0.5
+          );
+        }
 
         // Render the dramatic giant fist directly hovering over the target!
-        const alpha = Math.min(1.0, 0.4 + growProgress * 0.6);
+        const alpha = Math.min(1.0, 0.42 + growProgress * 0.58);
         a.fxPool.spawnPhysics(
           'fx_saitama_giant_fist',
           targetPX,
@@ -531,6 +700,22 @@ export const MINIT_SAITAMA = {
           0xffffff,
           alpha
         );
+
+        // Conqueror crimson-gold lightning arcs crackling off the Giant Fist
+        if (e.l % 3 === 0) {
+          a.fxPool.spawnPhysics(
+            'fx_saitama_lightning',
+            targetPX + FastMath.randRange(-22, 22),
+            fistY + FastMath.randRange(-16, 16),
+            FastMath.randRange(-1.2, 1.2),
+            FastMath.randRange(-1.2, 1.2),
+            5,
+            0.9,
+            0.9,
+            true,
+            e.l % 6 === 0 ? 0xff0033 : 0xffea00
+          );
+        }
 
         // Menacing pressure shock rings pulsing on the target
         if (e.l % 4 === 0) {
@@ -553,13 +738,13 @@ export const MINIT_SAITAMA = {
         if (e.l % 2 === 0) {
           for (let k = 0; k < 2; k++) {
             const spkAng = FastMath.rand() * 6.28;
-            const dist = FastMath.randRange(18, 40);
+            const dist = FastMath.randRange(20, 44);
             a.fxPool.spawnPhysics(
               'fx_saitama_dust',
               targetPX + Math.cos(spkAng) * dist,
               targetPY + Math.sin(spkAng) * dist,
-              -Math.cos(spkAng) * 3.5,
-              -Math.sin(spkAng) * 3.5,
+              -Math.cos(spkAng) * 3.8,
+              -Math.sin(spkAng) * 3.8,
               10,
               0.88,
               0.88,
@@ -570,26 +755,45 @@ export const MINIT_SAITAMA = {
         }
 
         // Escalating screen rumble as the giant fist grows
-        a.shake = Math.max(a.shake, growProgress * 7.5);
+        a.shake = Math.max(a.shake, growProgress * 8.5);
       }
       // ----------------------------------------------------
       // PHASE 2: 9999 DAMAGE SLAM IMPACT! (Frame 58)
       // ----------------------------------------------------
       else if (elapsed === 58) {
         AudioSys.play('saitama_death_slam');
+        AudioSys.play('saitama_aftershock');
         a.triggerFlash(1.0);             // Blinding white flash
         a.hitStop = 16;                  // Dramatic screen freeze
-        a.shake = Math.max(a.shake, 35); // Colossal screen shake
+        a.shake = Math.max(a.shake, 36); // Colossal screen shake
 
-        // Massive shockwave rings detonating across arena
-        a.fxPool.spawnShockwave(targetPX, targetPY, 0xff0000, 240, 12);
-        a.fxPool.spawnShockwave(targetPX, targetPY, 0xffd700, 180, 8);
-        a.fxPool.spawnShockwave(targetPX, targetPY, 0xffffff, 110, 5);
+        // Massive concentric shockwave rings detonating across arena
+        a.fxPool.spawnShockwave(targetPX, targetPY, 0xff0000, 260, 12);
+        a.fxPool.spawnShockwave(targetPX, targetPY, 0xffd700, 195, 8);
+        a.fxPool.spawnShockwave(targetPX, targetPY, 0xffffff, 130, 6);
+        a.fxPool.spawnShockwave(targetPX, targetPY, 0xff0044, 80, 4);
+
+        // Radial lightning & sonic shock eruption
+        for (let l = 0; l < 12; l++) {
+          const lAng = (Math.PI * 2 * l) / 12;
+          a.fxPool.spawnPhysics(
+            l % 2 === 0 ? 'fx_saitama_lightning' : 'fx_saitama_serious_shock',
+            targetPX,
+            targetPY,
+            Math.cos(lAng) * 7.5,
+            Math.sin(lAng) * 7.5,
+            16,
+            0.88,
+            0.88,
+            true,
+            l % 2 === 0 ? 0xff0033 : 0xffd700
+          );
+        }
 
         // Ground debris blast
-        for (let i = 0; i < 28; i++) {
+        for (let i = 0; i < 30; i++) {
           const dAng = FastMath.rand() * 6.28;
-          const dSpd = FastMath.randRange(4.0, 11.0);
+          const dSpd = FastMath.randRange(4.2, 11.5);
           a.fxPool.spawnPhysics(
             'fx_saitama_dust',
             targetPX,
@@ -613,8 +817,8 @@ export const MINIT_SAITAMA = {
               showText: true,
               textScale: 2.6,            // Extra large popup damage text!
               flash: 1.0,
-              shake: 35,
-              particleCount: 25,
+              shake: 36,
+              particleCount: 28,
               particleTex: 'fx_saitama_spark',
               sound: 'saitama_punch_hit',
               playSound: true

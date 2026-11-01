@@ -39,7 +39,7 @@ export const MINIT_LASER = {
       lightningColor: 0xaaffff,
       lightningBranches: 2,
       damage: 6,
-      rampingDamage: 2.5,
+      rampingDamage: 2.1,
       tickRate: 5,
       hitShake: 3,
       hitFlash: 0.1,
