@@ -11,7 +11,7 @@ export const MINIT_MURASAKI = {
   id: 'murasaki',
   name: 'Gojo',
   color: 0x9900ff,
-  desc: 'Colossal Hollow Purple with massive electric aura.',
+  desc: 'Murasaki.',
   stats: { hp: 1400, speed: 0.1 },
   targeting: { type: 'closest_enemy' },
 

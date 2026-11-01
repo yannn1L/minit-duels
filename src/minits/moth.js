@@ -12,7 +12,7 @@ export const MINIT_MOTH = {
   id: 'moth',
   name: 'MOTH',
   color: 0x88ffcc,
-  desc: 'Incubates & produces crawling larvae, then hatches into a winged spore-bomber.',
+  desc: 'Incubates, then hatches.',
   stats: { hp: 1350, speed: 0 }, // Slight sluggish wiggle during egg stage
   targeting: { type: 'closest_enemy' },
 
@@ -27,7 +27,7 @@ export const MINIT_MOTH = {
 
   // 1. Egg Incubation Lifecycle (Hatch Timer = 100 ticks / ~1.6 seconds)
   action: {
-    cd: 100,
+    cd: 300,
     count: 1,
     speed: 0,
     life: 1,
@@ -47,7 +47,7 @@ export const MINIT_MOTH = {
       // Separate Attack Action after hatching: Spore Bomb throw every 60 frames (~1.0s)
       action: {
         cd: 60,
-        count: 1,
+        count: 2,
         speed: 0.38,
         life: 55,
         scatterSpread: 0.25,
@@ -56,7 +56,7 @@ export const MINIT_MOTH = {
       }
     },
     zoneRadius: 1.2,
-    dmg: 55,
+    dmg: 75,
     destroyOnHit: true
   },
 

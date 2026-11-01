@@ -12,8 +12,8 @@ export const MINIT_SAITAMA = {
   id: 'saitama',
   name: 'Saitama',
   color: 0xffd700,
-  desc: 'Consecutive Punches, Serious Punch & 9999 Death Punch.',
-  stats: { hp: 1600, speed: 0.16 },
+  desc: 'Winrate Balancer.',
+  stats: { hp: 1300, speed: 0.16 },
   targeting: { type: 'closest_enemy' },
 
   deathVfx: {
