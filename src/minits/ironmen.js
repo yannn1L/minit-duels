@@ -43,7 +43,7 @@ export const MINIT_IRONMEN = {
   },
 
   action: {
-    cd: 120,
+    cd: 100,
     count: 1,
     speed: 0.14,
     life: 60,

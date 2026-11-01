@@ -1,7 +1,6 @@
 // ============================================================
 // SIMULATION / COMBAT SCENE (ES Module)
-// Responsive & Data-Driven: Supports Landscape & Portrait
-// In Landscape: Arena is in center, Minit cards on Left & Right
+// Responsive & Data-Driven: Supports Landscape, Portrait & Live Debug Overlay
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG, PALETTE, UI_STYLE } from '../config.js';
@@ -9,7 +8,9 @@ import { AudioSys } from '../engine/AudioSys.js';
 import { MinitEngine } from '../engine/Registry.js';
 import { Textures } from '../engine/AssetBaker.js';
 import { Arena } from '../engine/Arena.js';
-import { getIsLandscape } from '../main.js';
+import { DebugConfig } from '../engine/DebugConfig.js';
+import { DebugOverlay } from '../engine/DebugOverlay.js';
+import { SceneManager } from '../engine/SceneManager.js';
 
 export class SimulationScene extends PIXI.Container {
   constructor(app, selectedMinits, onRestart) {
@@ -25,7 +26,10 @@ export class SimulationScene extends PIXI.Container {
     this.uC = [];
     this.playerCards = [];
 
-    this.buildScene(getIsLandscape());
+    this.buildScene(SceneManager.getIsLandscape());
+
+    this.debugOverlay = new DebugOverlay(this.arena, this);
+    this.addChild(this.debugOverlay);
 
     this.arena.fxPool.initTex();
     AudioSys.play('start');
@@ -51,7 +55,7 @@ export class SimulationScene extends PIXI.Container {
     this.titleText.position.set(L.title.x, L.title.y);
     this.addChild(this.titleText);
 
-    // Arena Container (Positioned in exact center for landscape)
+    // Arena Container
     this.aG = new PIXI.Container();
     this.aG.pivot.set((CFG.GRID.COLS * CFG.GRID.TS) / 2, (CFG.GRID.ROWS * CFG.GRID.TS) / 2);
     this.aG.position.set(L.arena.x, L.arena.y);
@@ -65,6 +69,7 @@ export class SimulationScene extends PIXI.Container {
 
     this.selectedMinits.forEach((id, idx) => {
       const md = MinitEngine.Registry.minits[id];
+      if (!md) return;
       const cardCfg = idx === 0 ? L.p1_card : L.p2_card;
       const cardContainer = new PIXI.Container();
 
@@ -80,7 +85,6 @@ export class SimulationScene extends PIXI.Container {
     c.position.set(Math.round(cardCfg.x), Math.round(cardCfg.y));
     c.pivot.set(cardCfg.width / 2, cardCfg.height / 2);
 
-    // Crisp card body
     const bg = new PIXI.Graphics()
       .beginFill(PALETTE.CARD_BG)
       .lineStyle(2, PALETTE.BORDER, 1)
@@ -89,14 +93,12 @@ export class SimulationScene extends PIXI.Container {
     c.addChild(bg);
     c.addChild(new PIXI.Graphics().beginFill(md.color).drawRect(0, 0, cardCfg.width, 3).endFill());
 
-    // 16x16 Pixel Art Icon
     const ic = new PIXI.Sprite(Textures[`minit_${md.id}_base`] || PIXI.Texture.WHITE);
     ic.anchor.set(0.5);
     ic.scale.set(cardCfg.icon.scale);
     ic.position.set(Math.round(cardCfg.icon.x), Math.round(cardCfg.icon.y));
     c.addChild(ic);
 
-    // Minit Name
     const nm = new PIXI.Text(`${md.name}`, { ...UI_STYLE.H3, fill: md.color });
     nm.resolution = 2;
     if (isLandscape) {
@@ -105,7 +107,6 @@ export class SimulationScene extends PIXI.Container {
     nm.position.set(Math.round(cardCfg.name.x), Math.round(cardCfg.name.y));
     c.addChild(nm);
 
-    // HP Bar
     const hpC = new PIXI.Container();
     hpC.position.set(Math.round(cardCfg.hp.x), Math.round(cardCfg.hp.y));
 
@@ -130,7 +131,6 @@ export class SimulationScene extends PIXI.Container {
     hpC.addChild(hbB, hbF);
     c.addChild(hpC);
 
-    // Description
     const ds = new PIXI.Text(md.desc, {
       ...UI_STYLE.DESC_LARGE,
       wordWrapWidth: cardCfg.desc.wrapWidth
@@ -139,7 +139,6 @@ export class SimulationScene extends PIXI.Container {
     ds.position.set(Math.round(cardCfg.desc.x), Math.round(cardCfg.desc.y));
     c.addChild(ds);
 
-    // Status debuff icons
     const stC = new PIXI.Container();
     stC.position.set(Math.round(cardCfg.status.x), Math.round(cardCfg.status.y));
     c.addChild(stC);
@@ -169,6 +168,7 @@ export class SimulationScene extends PIXI.Container {
 
     this.selectedMinits.forEach((id, idx) => {
       const md = MinitEngine.Registry.minits[id];
+      if (!md) return;
       const cardCfg = idx === 0 ? L.p1_card : L.p2_card;
       const c = this.playerCards[idx];
       if (c) {
@@ -178,10 +178,24 @@ export class SimulationScene extends PIXI.Container {
   }
 
   loop(dl) {
+    const dbg = DebugConfig.state;
     const cDl = Math.min(dl, CFG.SIM.MAX_DT);
-    let cS = 1.0 * cDl;
 
-    if (this.isS) {
+    // Handle Debug Mode timeScale, Pause & Single-Tick Step
+    const speedMult = dbg.enabled ? (dbg.timeScale || 1.0) : 1.0;
+    let cS = cDl * speedMult;
+
+    if (dbg.enabled && dbg.paused) {
+      if (dbg.stepRequested) {
+        DebugConfig.state.stepRequested = false;
+        this.arena.hitStop = 0;
+        this.arena.tickLogic();
+        this.arena.updateVisuals(1.0);
+      }
+      cS = 0;
+    }
+
+    if (this.isS && cS > 0) {
       if (this.sT > 0) {
         cS = CFG.SIM.SLOWMO_SPEED * cDl;
         this.sT -= cDl;
@@ -189,7 +203,13 @@ export class SimulationScene extends PIXI.Container {
       }
     }
 
-    this.arena.update(cS);
+    if (cS > 0) {
+      this.arena.update(cS);
+    }
+
+    if (this.debugOverlay && !this.f) {
+      this.debugOverlay.update(this.app.ticker.FPS);
+    }
 
     if (this.f && this.wP && this.sP) {
       const f = (1.0 - this.wP.scale.x) * 0.3;
@@ -203,7 +223,7 @@ export class SimulationScene extends PIXI.Container {
     this.arena.players.forEach((p, idx) => {
       const ui = this.uC[idx];
       if (!ui) return;
-      const pct = Math.max(0, p.hp / ui.max);
+      const pct = Math.max(0, p.hp / p.maxHp);
 
       ui.fg.clear();
       if (pct > 0) {
@@ -259,7 +279,7 @@ export class SimulationScene extends PIXI.Container {
       this.onRestart();
     });
 
-    const isLandscape = getIsLandscape();
+    const isLandscape = SceneManager.getIsLandscape();
     const centerX = isLandscape ? CFG.APP.LANDSCAPE.W / 2 : CFG.APP.PORTRAIT.W / 2;
     const centerY = isLandscape ? CFG.APP.LANDSCAPE.H / 2 : CFG.APP.PORTRAIT.H / 2;
 
@@ -297,8 +317,10 @@ export class SimulationScene extends PIXI.Container {
 
     this.sP = false;
     setTimeout(() => {
-      this.addChild(overlay, this.wP);
-      this.sP = true;
+      if (!this.destroyed) {
+        this.addChild(overlay, this.wP);
+        this.sP = true;
+      }
     }, 60);
   }
 

@@ -1,16 +1,17 @@
 // ============================================================
-// LOADING SCENE (ES Module - Crisp HD)
+// LOADING SCENE (ES Module - Crisp HD + Custom Minit Hydration)
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG, UI_STYLE } from '../config.js';
 import { AssetBaker } from '../engine/AssetBaker.js';
-import { getIsLandscape } from '../main.js';
+import { CustomMinitManager } from '../engine/CustomMinitManager.js';
+import { SceneManager } from '../engine/SceneManager.js';
 
 export class LoadingScene extends PIXI.Container {
   constructor(app, onComplete) {
     super();
 
-    const isLandscape = getIsLandscape();
+    const isLandscape = SceneManager.getIsLandscape();
     const dims = isLandscape ? CFG.APP.LANDSCAPE : CFG.APP.PORTRAIT;
 
     const t = new PIXI.Text('BOOTING SYSTEM...', UI_STYLE.H2);
@@ -23,6 +24,11 @@ export class LoadingScene extends PIXI.Container {
       document.fonts ? document.fonts.ready : Promise.resolve(),
       new Promise((r) => setTimeout(r, 600))
     ]).then(async () => {
+      try {
+        CustomMinitManager.hydrateFromStorage();
+      } catch (e) {
+        console.warn('[LoadingScene] Custom minit hydration warning:', e);
+      }
       await AssetBaker.bake(app);
       window.dispatchEvent(new Event('resize'));
       setTimeout(onComplete, 100);

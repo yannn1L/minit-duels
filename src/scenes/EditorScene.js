@@ -1,13 +1,16 @@
 // ============================================================
 // COMPACT CHARACTER SELECT / EDITOR SCENE (ES Module)
-// Responsive & Data-Driven: Supports Landscape & Portrait
+// Responsive & Data-Driven: Supports Landscape, Portrait & Workshop Modal
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG, PALETTE, UI_STYLE } from '../config.js';
 import { AudioSys } from '../engine/AudioSys.js';
 import { MinitEngine } from '../engine/Registry.js';
 import { Textures } from '../engine/AssetBaker.js';
-import { getIsLandscape } from '../main.js';
+import { CustomMinitManager } from '../engine/CustomMinitManager.js';
+import { DebugConfig } from '../engine/DebugConfig.js';
+import { SceneManager } from '../engine/SceneManager.js';
+import { openWorkshopModal } from '../main.js';
 
 export class EditorScene extends PIXI.Container {
   constructor(onStartDuel) {
@@ -15,7 +18,18 @@ export class EditorScene extends PIXI.Container {
     this.sel = [];
     this.cb = onStartDuel;
     this.currentOrientation = null;
-    this.rebuild(getIsLandscape());
+    this.rebuild(SceneManager.getIsLandscape());
+
+    this.unsubscribeDebug = DebugConfig.subscribe(() => {
+      this.rebuild(SceneManager.getIsLandscape());
+    });
+
+    this._onWheel = (e) => {
+      if (!this.sC || this.mSY >= 0) return;
+      if (document.querySelector('.mw-backdrop.open')) return;
+      this.sC.y = Math.min(0, Math.max(this.mSY, this.sC.y - e.deltaY * 0.5));
+    };
+    window.addEventListener('wheel', this._onWheel, { passive: true });
   }
 
   onResize(isLandscape) {
@@ -28,7 +42,9 @@ export class EditorScene extends PIXI.Container {
     this.currentOrientation = isLandscape;
     this.removeChildren();
 
-    // Data-driven layout config
+    // Filter out any deleted custom minit IDs from current selection
+    this.sel = this.sel.filter((id) => MinitEngine.Registry.hasMinit(id));
+
     const L = isLandscape ? CFG.LAYOUT.EDITOR.LANDSCAPE : CFG.LAYOUT.EDITOR.PORTRAIT;
 
     // Header Title
@@ -44,6 +60,32 @@ export class EditorScene extends PIXI.Container {
     sub.anchor.set(0.5, 0);
     sub.position.set(L.subtitle.x, L.subtitle.y);
     this.addChild(sub);
+
+    // Workshop / Dev Tools Button (Top-Right in Landscape, Top-Right/Header in Portrait)
+    const dbgOn = DebugConfig.state.enabled;
+    const workshopLabel = dbgOn ? 'WORKSHOP [DBG ON]' : 'WORKSHOP / DEV';
+    const wsBtnX = isLandscape ? 790 : 440;
+    const wsBtnY = 34;
+    const wsBtn = this._createCompactButton(
+      workshopLabel,
+      wsBtnX,
+      wsBtnY,
+      dbgOn ? 0x00ff66 : PALETTE.NEON,
+      () => openWorkshopModal('minits')
+    );
+    this.addChild(wsBtn);
+
+    // Quick Balance Check Button (Top-Left in Landscape)
+    if (isLandscape) {
+      const balBtn = this._createCompactButton(
+        'BALANCE CHECK',
+        110,
+        34,
+        0xffdd00,
+        () => openWorkshopModal('balance')
+      );
+      this.addChild(balBtn);
+    }
 
     // Scroll Area
     this.sM = new PIXI.Graphics()
@@ -69,14 +111,14 @@ export class EditorScene extends PIXI.Container {
     const sX = (L.scroll.w - totW) / 2;
 
     const numRows = Math.ceil(mArr.length / cols);
-    const totalContentH = numRows * (cH + cCfg.gapY);
-    this.mSY = Math.min(0, L.scroll.h - totalContentH - 20);
+    const bottomMostY = cCfg.startY + numRows * (cH + cCfg.gapY);
+    const scrollBottomLimit = L.scroll.y + L.scroll.h;
+    this.mSY = Math.min(0, scrollBottomLimit - bottomMostY - 12);
 
     mArr.forEach((m, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
 
-      // Center cards if the last row has fewer items
       let rowStartX = sX;
       if (row === numRows - 1 && mArr.length % cols !== 0) {
         const lastRowCols = mArr.length % cols;
@@ -94,20 +136,23 @@ export class EditorScene extends PIXI.Container {
     });
 
     // Touch & pointer scrolling
+    let isDragging = false;
     let dragY = 0;
     let baseY = 0;
     this.sC.on('pointerdown', (e) => {
+      isDragging = true;
       dragY = e.global.y;
       baseY = this.sC.y;
     });
     this.sC.on('pointermove', (e) => {
-      if (dragY !== 0) {
-        this.sC.y = baseY + (e.global.y - dragY);
+      if (isDragging) {
+        const scaleY = this.parent?.scale?.y || 1;
+        this.sC.y = baseY + (e.global.y - dragY) / scaleY;
         this.sC.y = Math.min(0, Math.max(this.mSY, this.sC.y));
       }
     });
     const releaseDrag = () => {
-      dragY = 0;
+      isDragging = false;
     };
     this.sC.on('pointerup', releaseDrag);
     this.sC.on('pointerupoutside', releaseDrag);
@@ -148,6 +193,45 @@ export class EditorScene extends PIXI.Container {
     if (this.bD) {
       this.bD.visible = this.sel.length === 2;
     }
+  }
+
+  _createCompactButton(txt, x, y, borderColor, act) {
+    const b = new PIXI.Container();
+    b.position.set(Math.round(x), Math.round(y));
+    b.eventMode = 'static';
+    b.cursor = 'pointer';
+
+    const t = new PIXI.Text(txt, {
+      ...UI_STYLE.STATS_LARGE,
+      fontSize: 8,
+      fill: borderColor
+    });
+    t.resolution = 2;
+    t.anchor.set(0.5);
+
+    const bgW = t.width + 20;
+    const bgH = t.height + 12;
+
+    const bg = new PIXI.Graphics()
+      .beginFill(PALETTE.CARD_BG)
+      .lineStyle(2, borderColor, 1)
+      .drawRoundedRect(-bgW / 2, -bgH / 2, bgW, bgH, 4)
+      .endFill();
+
+    b.addChild(bg, t);
+    b.on('pointerover', () => {
+      bg.tint = 0x55ffaa;
+    });
+    b.on('pointerout', () => {
+      bg.tint = 0xffffff;
+    });
+    b.on('pointerdown', (e) => {
+      e.stopPropagation();
+      AudioSys.init();
+      AudioSys.play('click');
+      act();
+    });
+    return b;
   }
 
   _createButton(txt, x, y, act) {
@@ -211,6 +295,36 @@ export class EditorScene extends PIXI.Container {
     nm.resolution = 2;
     nm.position.set(Math.round(cCfg.name.x), Math.round(cCfg.name.y));
     c.addChild(nm);
+
+    // Custom Minit Delete button directly on the card
+    if (MinitEngine.Registry.isCustomMinit(d.id)) {
+      const delBtn = new PIXI.Container();
+      delBtn.position.set(w - 18, 6);
+      delBtn.eventMode = 'static';
+      delBtn.cursor = 'pointer';
+      const delBg = new PIXI.Graphics()
+        .beginFill(0x2a0814, 0.95)
+        .lineStyle(1, PALETTE.ALERT, 1)
+        .drawRoundedRect(0, 0, 12, 12, 2)
+        .endFill();
+      const delTxt = new PIXI.Text('X', {
+        fontFamily: 'monospace',
+        fontSize: 8,
+        fontWeight: 'bold',
+        fill: PALETTE.ALERT
+      });
+      delTxt.resolution = 2;
+      delTxt.anchor.set(0.5);
+      delTxt.position.set(6, 6);
+      delBtn.addChild(delBg, delTxt);
+      delBtn.on('pointerdown', (e) => {
+        e.stopPropagation();
+        AudioSys.play('crush', 0.4);
+        CustomMinitManager.deleteCustomMinit(d.id);
+        this.rebuild(this.currentOrientation);
+      });
+      c.addChild(delBtn);
+    }
 
     // HP Mini Bar
     const hpC = new PIXI.Container();
@@ -286,5 +400,15 @@ export class EditorScene extends PIXI.Container {
 
     c.on('pointerupoutside', () => (c.pD = false));
     return c;
+  }
+
+  destroy(options) {
+    if (this.unsubscribeDebug) {
+      this.unsubscribeDebug();
+    }
+    if (this._onWheel) {
+      window.removeEventListener('wheel', this._onWheel);
+    }
+    super.destroy(options);
   }
 }

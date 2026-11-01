@@ -1,6 +1,6 @@
 // ============================================================
 // MINIT DUELS - MAIN APPLICATION ENTRY POINT (ES Module)
-// Supports Adaptive Landscape (Desktop) & Portrait (Mobile)
+// Supports Adaptive Landscape (Desktop), Portrait (Mobile) & Workshop Suite
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG } from './config.js';
@@ -12,13 +12,16 @@ import { SceneManager } from './engine/SceneManager.js';
 import { LoadingScene } from './scenes/LoadingScene.js';
 import { EditorScene } from './scenes/EditorScene.js';
 import { SimulationScene } from './scenes/SimulationScene.js';
+import { WorkshopModal } from './ui/WorkshopModal.js';
 
 // Setup PIXI defaults for crisp HD pixel art (without deprecation warnings)
 if (PIXI.BaseTexture?.defaultOptions) {
   PIXI.BaseTexture.defaultOptions.scaleMode = PIXI.SCALE_MODES.NEAREST;
   PIXI.BaseTexture.defaultOptions.wrapMode = PIXI.WRAP_MODES.CLAMP;
 }
-PIXI.settings.ROUND_PIXELS = false;
+if (PIXI.settings) {
+  PIXI.settings.ROUND_PIXELS = false;
+}
 
 // Initialize Core Registries
 registerBaseAssets();
@@ -39,7 +42,9 @@ export const app = new PIXI.Application({
   powerPreference: 'high-performance'
 });
 
-app.renderer.texture.defaultScaleMode = PIXI.SCALE_MODES.NEAREST;
+if (app.renderer?.texture) {
+  app.renderer.texture.defaultScaleMode = PIXI.SCALE_MODES.NEAREST;
+}
 
 export const gameContainer = new PIXI.Container();
 app.stage.addChild(gameContainer);
@@ -58,6 +63,24 @@ export function handleResize() {
 
 export function setScene(scene) {
   SceneManager.setScene(scene);
+}
+
+// Initialize Workshop & Developer Modal Suite
+let workshopModalInstance = null;
+
+export function openWorkshopModal(defaultTab = 'minits') {
+  if (!workshopModalInstance) {
+    workshopModalInstance = new WorkshopModal({
+      app,
+      onMinitsChanged: () => {
+        const active = SceneManager.getActiveScene();
+        if (active && typeof active.rebuild === 'function') {
+          active.rebuild(SceneManager.getIsLandscape());
+        }
+      }
+    });
+  }
+  workshopModalInstance.open(defaultTab);
 }
 
 // User interaction gesture to unlock Web Audio Context

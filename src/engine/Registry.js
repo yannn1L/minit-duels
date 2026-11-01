@@ -1,5 +1,6 @@
 // ============================================================
-// MINIT ENGINE REGISTRY (ES Module - Robust & Modular)
+// MINIT ENGINE REGISTRY (ES Module - Robust, Modular & Dynamic)
+// Supports Built-In & External User-Imported Minits
 // ============================================================
 import { validateAndSanitizeMinit } from './MinitContract.js';
 
@@ -10,6 +11,8 @@ export const MinitEngine = {
     traits: {},
     targeting: {},
     minits: {},
+    builtInMinitIds: new Set(),
+    customMinitIds: new Set(),
 
     addTexture(id, fnOrUrl) {
       if (id) this.textures[id] = fnOrUrl;
@@ -31,13 +34,18 @@ export const MinitEngine = {
       }
     },
 
-    addMinit(rawConfig) {
+    addMinit(rawConfig, options = {}) {
       const { valid, errors, sanitized } = validateAndSanitizeMinit(rawConfig);
       if (!valid) {
         console.warn(`[MinitRegistry] Minit "${rawConfig?.id || 'unknown'}" had validation issues:`, errors);
       }
+      if (!sanitized) return null;
 
-      const config = sanitized;
+      const isCustom = Boolean(options.isCustom || rawConfig?.isCustom);
+      const config = {
+        ...sanitized,
+        isCustom
+      };
 
       // Register custom traits
       if (config.customTraits) {
@@ -70,7 +78,55 @@ export const MinitEngine = {
       }
 
       this.minits[config.id] = config;
+      if (isCustom) {
+        this.customMinitIds.add(config.id);
+      } else {
+        this.builtInMinitIds.add(config.id);
+      }
       return config;
+    },
+
+    removeMinit(id) {
+      // Never delete built-in core Minits
+      if (this.builtInMinitIds.has(id)) {
+        return false;
+      }
+
+      const existing = this.minits[id];
+      if (!existing) return false;
+
+      if (existing.textures) {
+        Object.keys(existing.textures).forEach((k) => {
+          delete this.textures[`minit_${id}_${k}`];
+        });
+      }
+      if (existing.customTextures) {
+        Object.keys(existing.customTextures).forEach((k) => {
+          delete this.textures[k];
+        });
+      }
+      if (existing.customTraits) {
+        Object.keys(existing.customTraits).forEach((k) => {
+          delete this.traits[k];
+        });
+      }
+      if (existing.customAudio) {
+        Object.keys(existing.customAudio).forEach((k) => {
+          delete this.audio[k];
+        });
+      }
+
+      delete this.minits[id];
+      this.customMinitIds.delete(id);
+      return true;
+    },
+
+    isBuiltInMinit(id) {
+      return this.builtInMinitIds.has(id);
+    },
+
+    isCustomMinit(id) {
+      return !this.builtInMinitIds.has(id) && (this.customMinitIds.has(id) || Boolean(this.minits[id]?.isCustom));
     },
 
     getMinit(id) {

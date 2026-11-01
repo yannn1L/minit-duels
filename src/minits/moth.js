@@ -26,7 +26,7 @@ export const MINIT_MOTH = {
 
   // 1. Egg Incubation Lifecycle
   action: {
-    cd: 300,
+    cd: 400,
     count: 1,
     speed: 0,
     life: 1,
@@ -60,7 +60,7 @@ export const MINIT_MOTH = {
       }
     },
     zoneRadius: 1.2,
-    dmg: 75,
+    dmg: 65,
     destroyOnHit: true,
     hitVfx: {
       shake: 7,

@@ -25,10 +25,10 @@ export const MINIT_ABSORB = {
   payload: {
     zoneRadius: 2.3,       // Balanced radius (allows enemies with good movement to evade)
     zoneDuration: 180,
-    tickRate: 7,           // 4 ticks per second
+    tickRate: 7,           // 7 ticks per second
     drain: {
       speed: 0.9,          // Gentle gravitational pull instead of paralyzing stun
-      hp: 4.0,             // Fair drain damage per tick
+      hp: 4.3,             // Fair drain damage per tick
       vfxLeech: 'fx_absorb_energy',
       vfxLeechColor: 0xffaa00,
       hitVfx: {

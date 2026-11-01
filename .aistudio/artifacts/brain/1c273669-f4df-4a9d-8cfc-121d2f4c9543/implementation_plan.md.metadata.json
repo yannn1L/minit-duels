@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for the modular, high-fidelity beam attack VFX system for Laser, Gojo, and Ironman. Features multi-layered glowing vector beams, crackling plasma arcs, muzzle flares, impact bursts, and flexible aim behaviors.",
-  "updatedAt":  "2026-10-31T02:12:22.766358507Z",
+  "summary":  "Implementation plan for the Minit Studio & Developer Workshop overlay, including external Minit JS + PNG auto-sync import, localStorage persistence and deletion, live Arena debugging telemetry, and a full headless balancing simulator with matchup matrix, winrates, TTK, and damage telemetry.",
+  "updatedAt":  "2026-11-01T16:08:18.873526682Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

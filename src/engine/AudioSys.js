@@ -2,7 +2,6 @@
 // AUDIO SYSTEM (ES Module - Zero-Allocation Noise Cache)
 // ============================================================
 import { CFG } from '../config.js';
-import { FastMath } from './FastMath.js';
 import { MinitEngine } from './Registry.js';
 
 class AudioSystem {
@@ -12,9 +11,11 @@ class AudioSystem {
     this.masterGain = null;
     this.compressor = null;
     this.cachedNoiseBuffer = null;
+    this.muted = false;
   }
 
   ensureContext() {
+    if (this.muted) return;
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
@@ -34,7 +35,6 @@ class AudioSystem {
       this.compressor.connect(this.ctx.destination);
 
       // Pre-bake 2 seconds of high-quality white noise once into a shared buffer
-      // This completely removes audio buffer allocation and random loop hitches!
       const sampleRate = this.ctx.sampleRate || 44100;
       const numSamples = sampleRate * 2;
       this.cachedNoiseBuffer = this.ctx.createBuffer(1, numSamples, sampleRate);
@@ -50,6 +50,7 @@ class AudioSystem {
   }
 
   play(type, volumeMultiplier = 1) {
+    if (this.muted) return;
     this.ensureContext();
     if (!this.ctx || this.ctx.state === 'suspended' || !this.masterGain) return;
 
@@ -100,8 +101,7 @@ class AudioSystem {
       osc.stop(time + Math.min(0.4, def.d));
     }
 
-    // Start with random offset into prebaked noise
-    const offset = (Math.random() * 0.8);
+    const offset = Math.random() * 0.8;
     noiseSource.start(time, offset, def.d);
 
     noiseSource.onended = () => {
