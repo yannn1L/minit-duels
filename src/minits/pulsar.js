@@ -27,7 +27,7 @@ export const MINIT_PULSAR = {
     fireRate: 2,
     angleStep: 0.22,
     bulletDmg: 12,
-    bulletLife: 35,
+    bulletLife: 40,
     bulletSpeed: 0.65,
     hitVfx: {
       shake: 1.5,

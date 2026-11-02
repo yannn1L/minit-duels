@@ -60,7 +60,7 @@ export const MINIT_MOTH = {
       }
     },
     zoneRadius: 1.2,
-    dmg: 65,
+    dmg: 60,
     destroyOnHit: true,
     hitVfx: {
       shake: 7,

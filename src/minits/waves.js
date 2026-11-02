@@ -31,7 +31,7 @@ export const MINIT_WAVES = {
       payload: {
         id: 'paralysis',
         icon: 'icon_paralysis',
-        dmg: 23,
+        dmg: 23.5,
         tick: 8,
         vfxTex: 'fx_paralysis_spark',
         hitVfx: {

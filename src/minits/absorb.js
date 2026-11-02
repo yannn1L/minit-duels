@@ -28,7 +28,7 @@ export const MINIT_ABSORB = {
     tickRate: 7,           // 7 ticks per second
     drain: {
       speed: 0.9,          // Gentle gravitational pull instead of paralyzing stun
-      hp: 4.3,             // Fair drain damage per tick
+      hp: 4.8,             // Fair drain damage per tick
       vfxLeech: 'fx_absorb_energy',
       vfxLeechColor: 0xffaa00,
       hitVfx: {
@@ -42,14 +42,14 @@ export const MINIT_ABSORB = {
     buff: {
       scale: 0.008,
       maxScale: 1.8,       // Balanced visual growth
-      dmgMult: 0.03,
-      maxDmgMult: 9.0,     // Capped multiplier
+      dmgMult: 0.034,
+      maxDmgMult: 12.0,     // Capped multiplier
       sound: 'absorb_ding'
     }
   },
 
   action: {
-    cd: 220,
+    cd: 200,
     count: 1,
     speed: 0,
     life: 1,

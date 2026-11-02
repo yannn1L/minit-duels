@@ -26,7 +26,7 @@ export const MINIT_IRONMEN = {
   },
 
   payload: {
-    missileDmg: 32,
+    missileDmg: 32.5,
     ramDmg: 65,
     beamTickDmg: 13,
     knockbackForce: 1.25,
@@ -43,7 +43,7 @@ export const MINIT_IRONMEN = {
   },
 
   action: {
-    cd: 100,
+    cd: 90,
     count: 1,
     speed: 0.14,
     life: 60,
