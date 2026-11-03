@@ -119,49 +119,55 @@ export const CFG = {
     // ----------------------------------------------------
     EDITOR: {
       LANDSCAPE: {
-        title: { x: 450, y: 20 },
-        subtitle: { x: 450, y: 48 },
-        scroll: { x: 0, y: 70, w: 900, h: 360 },
+        title: { x: 450, y: 14 },
+        subtitle: { x: 450, y: 42 },
+        scroll: { x: 20, y: 68, w: 860, h: 368 },
         card: {
           cols: 4,
-          baseW: 196,
-          baseH: 98,
+          baseW: 198,
+          baseH: 108,
           scale: 1.0,
-          gapX: 30,
+          gapX: 16,
           gapY: 12,
-          startY: 78,
-          icon: { x: 25, y: 25, scale: 2.0 },
-          name: { x: 52, y: 8 },
-          hp: { x: 52, y: 24, w: 125, h: 8, segments: 10, segW: 9, gap: 3 },
-          desc: { x: 10, y: 44, wrapWidth: 176 }
+          startY: 8,
+          icon: { x: 28, y: 28, scale: 2.1 },
+          name: { x: 54, y: 10 },
+          hp: { x: 54, y: 28, w: 130, h: 8, segments: 10, segW: 10, gap: 3 },
+          desc: { x: 10, y: 54, wrapWidth: 178 }
         },
         footer: {
-          selectedTxt: { x: 260, y: 470 },
-          indicator: { x: 380, y: 470 },
-          btnDuel: { x: 640, y: 470 }
+          dock: { x: 20, y: 442, w: 860, h: 88 },
+          p1Slot: { x: 34, y: 452, w: 214, h: 68 },
+          vsTxt: { x: 268, y: 486 },
+          p2Slot: { x: 288, y: 452, w: 214, h: 68 },
+          btnRandom: { x: 576, y: 486, w: 118, h: 48 },
+          btnDuel: { x: 758, y: 486, w: 216, h: 48 }
         }
       },
       PORTRAIT: {
-        title: { x: 270, y: 22 },
-        subtitle: { x: 270, y: 50 },
-        scroll: { x: 0, y: 78, w: 540, h: 560 },
+        title: { x: 270, y: 14 },
+        subtitle: { x: 270, y: 42 },
+        scroll: { x: 14, y: 72, w: 512, h: 556 },
         card: {
           cols: 2,
-          baseW: 236,
-          baseH: 104,
+          baseW: 242,
+          baseH: 112,
           scale: 1.0,
           gapX: 14,
           gapY: 12,
-          startY: 84,
-          icon: { x: 28, y: 28, scale: 2.2 },
-          name: { x: 56, y: 10 },
-          hp: { x: 56, y: 28, w: 140, h: 9, segments: 10, segW: 10, gap: 3 },
-          desc: { x: 12, y: 48, wrapWidth: 212 }
+          startY: 8,
+          icon: { x: 30, y: 30, scale: 2.2 },
+          name: { x: 58, y: 10 },
+          hp: { x: 58, y: 28, w: 156, h: 8, segments: 10, segW: 12, gap: 3 },
+          desc: { x: 12, y: 56, wrapWidth: 218 }
         },
         footer: {
-          selectedTxt: { x: 270, y: 670 },
-          indicator: { x: 270, y: 706 },
-          btnDuel: { x: 270, y: 752 }
+          dock: { x: 14, y: 634, w: 512, h: 154 },
+          p1Slot: { x: 26, y: 644, w: 216, h: 68 },
+          vsTxt: { x: 270, y: 678 },
+          p2Slot: { x: 298, y: 644, w: 216, h: 68 },
+          btnRandom: { x: 115, y: 752, w: 178, h: 48 },
+          btnDuel: { x: 365, y: 752, w: 298, h: 48 }
         }
       }
     }
