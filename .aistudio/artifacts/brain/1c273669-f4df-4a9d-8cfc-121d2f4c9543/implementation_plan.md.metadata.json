@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for expanding the Minit Builder & Combat Engine with full lifecycle hooks, multi-ability slots, custom movement AI, destroyable summons/clones/shields, and a high-level MinitSDK helper API.",
-  "updatedAt": "2026-11-04T04:06:44.804685316Z",
+  "summary": "Implementation plan for the High-Performance Combat Juice & Particle Graphics Engine upgrade, covering directional hit sparks, motion trails/afterimages, multi-ring shockwaves, floor scorch decals, status auras, additive bloom glow, reactive arena grid/wall ripples, critical damage popups, and an auto-adaptive particle budget with a VFX quality toggle.",
+  "updatedAt": "2026-11-04T04:52:21.519720197Z",
   "requestFeedback": true,
   "userFacing": true
 }

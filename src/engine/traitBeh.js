@@ -108,18 +108,43 @@ export function registerTraitsAndTargeting() {
 
     // X-axis boundary collision
     if (entity.curX < CFG.ARENA_BOUNDS.MIN_X || entity.curX > CFG.ARENA_BOUNDS.MAX_X) {
+      const hitLeft = entity.curX < CFG.ARENA_BOUNDS.MIN_X;
       entity.curX = Math.max(CFG.ARENA_BOUNDS.MIN_X, Math.min(entity.curX, CFG.ARENA_BOUNDS.MAX_X));
       entity.dx *= CFG.PHYSICS.BOUNCE;
       arena.shake = Math.max(arena.shake, entity.p?.vfx?.shake || 0);
       AudioSys.play('hit', 0.2);
+      if (!arena.isHeadless) {
+        const wX = hitLeft ? 0 : CFG.GRID.COLS * CFG.GRID.TS;
+        const wY = entity.curY * CFG.GRID.TS + CFG.GRID.HALF_TS;
+        const col = entity.p?.color || 0x00e5ff;
+        if (arena.spawnWallRipple) arena.spawnWallRipple(hitLeft ? 'left' : 'right', wX, wY, col);
+        arena.fxPool.spawnSparkBurst(wX, wY, hitLeft ? 0 : Math.PI, col, 3, 2.2, 0.7, 12);
+      }
     }
 
     // Y-axis boundary collision
     if (entity.curY < CFG.ARENA_BOUNDS.MIN_Y || entity.curY > CFG.ARENA_BOUNDS.MAX_Y) {
+      const hitTop = entity.curY < CFG.ARENA_BOUNDS.MIN_Y;
       entity.curY = Math.max(CFG.ARENA_BOUNDS.MIN_Y, Math.min(entity.curY, CFG.ARENA_BOUNDS.MAX_Y));
       entity.dy *= CFG.PHYSICS.BOUNCE;
       arena.shake = Math.max(arena.shake, entity.p?.vfx?.shake || 0);
       AudioSys.play('hit', 0.2);
+      if (!arena.isHeadless) {
+        const wX = entity.curX * CFG.GRID.TS + CFG.GRID.HALF_TS;
+        const wY = hitTop ? 0 : CFG.GRID.ROWS * CFG.GRID.TS;
+        const col = entity.p?.color || 0x00e5ff;
+        if (arena.spawnWallRipple) arena.spawnWallRipple(hitTop ? 'top' : 'bottom', wX, wY, col);
+        arena.fxPool.spawnSparkBurst(
+          wX,
+          wY,
+          hitTop ? Math.PI * 0.5 : -Math.PI * 0.5,
+          col,
+          3,
+          2.2,
+          0.7,
+          12
+        );
+      }
     }
 
     entity.x = entity.curX;
@@ -131,23 +156,31 @@ export function registerTraitsAndTargeting() {
     if (--entity.l <= 0) entity.dead = true;
   });
 
-  // Spawn particle trail behind moving entity
+  // Spawn particle trail & additive afterimage behind moving entity
   MinitEngine.Registry.addTrait('trailParticles', (entity, arena) => {
     const posX = (entity.curX ?? entity.x) * CFG.GRID.TS + CFG.GRID.HALF_TS;
     const posY = (entity.curY ?? entity.y) * CFG.GRID.TS + CFG.GRID.HALF_TS;
+    const col = entity.p?.color || 0x00e5ff;
 
-    if (entity.p?.vfx?.trailTex && entity.l % 2 === 0) {
+    if (entity.p?.vfx?.trailTex) {
+      // Main projectile head + soft additive halo
       arena.fxPool.spawnPhysics(
         entity.p.vfx.trailTex,
         posX,
         posY,
-        entity.p.vfx.trailVx || 0,
-        entity.p.vfx.trailVy || 0,
-        10,
-        entity.p.vfx.trailDragX || 1,
-        entity.p.vfx.trailDragY || 1,
-        1
+        entity.p.vfx.trailVx || -entity.dx * 0.6,
+        entity.p.vfx.trailVy || -entity.dy * 0.6,
+        entity.l % 2 === 0 ? 11 : 4,
+        entity.p.vfx.trailDragX || 0.9,
+        entity.p.vfx.trailDragY || 0.9,
+        true,
+        0xffffff,
+        1.0,
+        { additive: true, grav: 0 }
       );
+      if (entity.l % 3 === 0) {
+        arena.fxPool.spawnGlow(posX, posY, col, 0.55, 8, 0.38);
+      }
     }
   });
 
@@ -168,20 +201,22 @@ export function registerTraitsAndTargeting() {
     e.y = tgt.y;
     if (pay.icon) tgt.activeStatuses.add(pay.icon);
 
-    if (e.l % (pay.vfxTick || 5) === 0 && pay.vfxTex) {
+    if (e.l % (pay.vfxTick || 5) === 0 && (pay.vfxTex || e.p.color)) {
       const pX = e.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
       const pY = e.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
       a.fxPool.spawnPhysics(
-        pay.vfxTex,
+        pay.vfxTex || 'fx_ember',
         pX + FastMath.randRange(-8, 8),
         pY + FastMath.randRange(-8, 8),
-        0,
-        -1,
-        15,
-        1,
-        1,
+        FastMath.randRange(-0.3, 0.3),
+        -1.1,
+        16,
+        0.95,
+        0.95,
         true,
-        0xffffff
+        pay.vfxTex ? 0xffffff : e.p.color || 0x00ff44,
+        0.9,
+        { additive: true, grav: -0.05 }
       );
     }
 
@@ -746,34 +781,54 @@ export function registerTraitsAndTargeting() {
       e.curY = e.y;
     }
 
-    // Render projectile visual & trail
+    // Render projectile visual & additive motion trail
     if (!a.isHeadless) {
       const pX = e.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
       const pY = e.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      const tintCol = cfg.tint ?? e.p.color ?? 0xffffff;
+      const velAng = Math.atan2(e.dy, e.dx);
+
       a.fxPool.spawnPhysics(
         cfg.tex || 'fx_spark',
         pX,
         pY,
-        0,
-        0,
-        2,
+        e.dx * 2,
+        e.dy * 2,
+        3,
         1,
         1,
         false,
-        cfg.tint ?? e.p.color ?? 0xffffff
+        tintCol,
+        1.0,
+        {
+          additive: true,
+          alignToVel: true,
+          stretchFactor: 0.45,
+          scale: 1.15,
+          grav: 0,
+          rotation: velAng,
+          forceSpawn: true
+        }
       );
+
+      if (e.l % 2 === 0) {
+        a.fxPool.spawnGlow(pX, pY, tintCol, 0.5, 6, 0.35);
+      }
+
       if (cfg.trailTex && e.l % 2 === 0) {
         a.fxPool.spawnPhysics(
           cfg.trailTex,
           pX,
           pY,
-          -e.dx * 1.2,
-          -e.dy * 1.2,
-          8,
+          -e.dx * 1.2 + FastMath.randRange(-0.4, 0.4),
+          -e.dy * 1.2 + FastMath.randRange(-0.4, 0.4),
+          9,
           0.88,
           0.88,
           true,
-          cfg.tint ?? e.p.color ?? 0xffffff
+          tintCol,
+          0.85,
+          { additive: true, grav: 0 }
         );
       }
     }

@@ -140,6 +140,8 @@ export class AssetBaker {
       digitTasks.push({ key: 'digit_' + i, text: i.toString() });
     }
     digitTasks.push({ key: 'digit_minus', text: '-' });
+    digitTasks.push({ key: 'digit_plus', text: '+' });
+    digitTasks.push({ key: 'digit_bang', text: '!' });
 
     for (let i = 0; i < digitTasks.length; i++) {
       const task = digitTasks[i];

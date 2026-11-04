@@ -22,6 +22,7 @@ export class BeamRenderer {
     for (let i = 0; i < 12; i++) {
       const g = new PIXI.Graphics();
       g.visible = false;
+      g.blendMode = PIXI.BLEND_MODES.ADD;
       this.beamContainer.addChild(g);
       this.pool.push(g);
     }
@@ -31,6 +32,7 @@ export class BeamRenderer {
     let g = this.pool.pop();
     if (!g) {
       g = new PIXI.Graphics();
+      g.blendMode = PIXI.BLEND_MODES.ADD;
       this.beamContainer.addChild(g);
     }
     g.visible = true;

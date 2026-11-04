@@ -456,6 +456,8 @@ export class EditorScene extends PIXI.Container {
     if (this._onWheel) {
       window.removeEventListener('wheel', this._onWheel);
     }
-    super.destroy(options);
+    try {
+      super.destroy(options);
+    } catch (e) {}
   }
 }

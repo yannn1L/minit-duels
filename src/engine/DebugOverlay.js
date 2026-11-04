@@ -228,9 +228,11 @@ export class DebugOverlay extends PIXI.Container {
     if (st.showTelemetry) {
       const p1 = this.arena.players[0];
       const p2 = this.arena.players[1];
+      const vfxMode = (st.vfxQuality || 'auto').toUpperCase();
+      const budgetPct = Math.round((this.arena.fxPool.getBudgetMult ? this.arena.fxPool.getBudgetMult() : 1) * 100);
       const lines = [
         `DEBUG TELEMETRY | FPS: ${Math.round(fps)} | TICKS: ${this.arena.totalTicks} (${(this.arena.totalTicks / 60).toFixed(1)}s)`,
-        `ENTITIES: ${this.arena.actE.length} active / ${this.arena.deadE.length} pooled | VFX: ${this.arena.fxPool.act.phys.length} phys`,
+        `ENTITIES: ${this.arena.actE.length} act | VFX (${vfxMode} ${budgetPct}%): ${this.arena.fxPool.act.phys.length} phys · ${this.arena.fxPool.act.decals?.length || 0} decals · ${this.arena.fxPool.act.sws.length} rings`,
         p1
           ? `P1 [${p1.def.name}]: HP ${Math.ceil(p1.hp)}/${p1.maxHp} | DMG Dealt: ${Math.round(p1.telemetry.dmgDealt)} | CD: ${p1.t}/${p1.def.action?.cd || 0}`
           : '',
@@ -255,18 +257,26 @@ export class DebugOverlay extends PIXI.Container {
   }
 
   destroy(options) {
-    if (this.worldGfx && !this.worldGfx.destroyed) {
-      this.worldGfx.destroy();
+    if (this.worldGfx) {
+      try {
+        if (!this.worldGfx.destroyed && this.worldGfx._geometry) {
+          this.worldGfx.destroy();
+        }
+      } catch (e) {}
+      this.worldGfx = null;
     }
-    this.worldGfx = null;
     if (this.playerLabels) {
       this.playerLabels.forEach((l) => {
-        if (l && !l.destroyed) {
-          l.destroy();
-        }
+        try {
+          if (l && !l.destroyed) {
+            l.destroy();
+          }
+        } catch (e) {}
       });
       this.playerLabels = [];
     }
-    super.destroy(options);
+    try {
+      super.destroy(options);
+    } catch (e) {}
   }
 }

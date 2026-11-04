@@ -1,96 +1,110 @@
-# Universal Minit Builder & Flexible Combat Engine Architecture
+# High-Performance Combat Juice & Particle Graphics Upgrade
 
-This upgrade transforms the Minit combat engine from a fixed single-cooldown loop into an open, extensible **Universal Fighter & Entity Sandbox**. Creators can still build Minits with simple declarative configs, or combine **Full Lifecycle Hooks**, **Multi-Ability Slots & Passives**, **Pluggable Movement AI**, **Destroyable Summons/Clones/Turrets**, and **Projectile-Blocking Shields**—making any fighter archetype possible.
-
----
+Deliver a visceral, arcade-grade visual and particle overhaul for Minit Duels—combining directional hit sparks, additive bloom glows, dash/projectile afterimages, multi-ring shockwaves, persistent floor scorch marks, reactive arena grid ripples, and bouncy damage popups—all running inside a zero-allocation object pool with an auto-adaptive FPS budget and a user-selectable VFX Quality toggle.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following architectural decisions are confirmed from your answers and maintain **100% backward compatibility** with all existing built-in and custom Minits:
+> All core visual, particle, and performance preferences have been confirmed in Phase 1:
 
-- **Full Fighter & Entity Lifecycle Hooks**: Unlock `onInit`, `onTick`, `onMove`, `onAction`, `onWallBounce`, `onBeforeDealDamage`, `onDealDamage`, `onBeforeDamaged`, `onDamaged`, `onBeforeDeath` (enabling revives, immortality windows, and boss phase transitions), and `onDeath`.
-- **Multi-Ability Slots, Passives & State Machines**: Support an `actions: [...]` array (multiple independent cooldowns, energy/combo conditions, and weights) alongside the classic single `action` object, plus `passive` traits, shields (`owner.shield`), stun/freeze (`owner.stunTicks`), invulnerability (`owner.invulnTicks`), and `owner.state`.
-- **Pluggable Movement AI**: Built-in movement controllers (`wander`, `chase`, `kite`, `orbit`, `strafe`, `stationary`, `teleport_step`, or a custom `onMove` callback) so fighters can act as snipers, assassins, orbiters, or brawlers.
-- **Destroyable Summons, Clones, Turrets & Projectile-Blocking Barriers**: Spawnable sub-units with their own HP, sprites, AI, and attacks, plus barrier/shield entities that intercept or reflect enemy projectiles.
-- **Keep File-Only Workshop & Expand Starter Template**: Keep the Dev modal compact and file-import focused while upgrading the downloadable `.js` starter template and `README.md` to showcase the full Minit SDK.
+- **Confirmed Decision 1 — Particle & Surface Effects**: Implement directional hit sparks, glowing embers, and flash bursts; motion trails and ghost afterimages for dashes, teleports, and fast projectiles; multi-ring shockwaves and persistent fading floor scorch marks; plus ambient status aura particles for shields, poison, stun, and slow states.
+- **Confirmed Decision 2 — Combat Juice & Arena Presentation**: Add dynamic hit-stop scaling, directional knockback, and velocity-aligned squash-and-stretch; additive (`BLEND_MODES.ADD`) bloom glow layers on projectiles, beams, and fighters; critical/heavy-hit damage popups with color coding and elastic bounce physics; and a reactive arena grid with wall impact ripples on collisions.
+- **Confirmed Decision 3 — Performance & Quality Controls**: Use an auto-adaptive particle budget that dynamically scales emission density if frame rate dips below 52 FPS, paired with an explicit VFX Quality selector (`AUTO` / `HIGH` / `LOW`) accessible in the HUD and Dev panel.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Removes all hardcoded assumptions about how a Minit moves, attacks, takes damage, or dies. Every aspect of a fighter's behavior can be configured declaratively or scripted via clean JavaScript hooks and `MinitSDK` helper methods.
-- **Target Audience / Persona**: Game developers and players creating custom Minits ranging from simple projectile fighters to complex multi-phase bosses, necromancer summoners, shield paladins, and teleporting assassins.
-- **Key Value**: Unlimited creative freedom with zero boilerplate math—works identically in live WebGL duels and high-speed Headless Balance simulations.
+- **What It Does**: Transforms every collision, projectile volley, laser beam, dash, and knockout into a tactile, high-contrast spectacle while maintaining 60 FPS determinism and 100% compatibility with headless balance simulations.
+- **Target Audience / Persona**: Players and Minit creators who want fights to feel punchy, readable, and satisfying on both desktop and mobile viewports without frame drops during bullet-hell or summon-heavy matchups.
+- **Key Value**:
+  - **Visceral Impact Feedback**: Every hit communicates direction, force, and damage tier through directional spark cones, hit-stop micro-freezes, additive glow bursts, and elastic damage numbers.
+  - **Living Arena Floor**: Explosions leave fading scorch marks on the floor layer, and wall bounces or shockwaves send localized energy ripples across the arena grid and perimeter guards.
+  - **Guaranteed 60 FPS**: Pre-allocated sprite pools with O(1) swap-and-pop recycling and an automatic frame-time governor ensure zero garbage-collection pauses even when hundreds of particles are active.
 
 ---
 
-## 2. User Experience & Creator Workflow
+## 2. User Experience & Visual Design
 
-- **Authoring Experience**:
-  1. **Declarative Simplicity**: A creator can define `movement: { type: 'kite', idealDist: 5 }`, `actions: [primaryShot, ultimateBeam]`, and `stats: { hp: 1100, shield: 200, speed: 0.15 }` without writing low-level physics code.
-  2. **Unlimited Scripting Power**: For bespoke mechanics (e.g., countering hits while a shield is up, splitting into 2 clones at 50% HP, or stealing enemy stats), creators define `hooks: { onBeforeDamaged(self, dmgInfo, arena) { ... }, onBeforeDeath(self, arena) { ... } }`.
-  3. **Ergonomic `MinitSDK` Helpers**: Creators can call intuitive methods on the `arena` (or injected `SDK` object) such as `a.shootProjectile(...)`, `a.spawnSummon(...)`, `a.spawnShieldBarrier(...)`, `a.teleport(...)`, `a.dash(...)`, `a.heal(...)`, `a.addShield(...)`, and `a.setPhase(...)` using grid coordinates directly without manual pixel conversion.
-- **Visual & Simulation Fidelity**:
-  - Summons, clones, and turrets render their own crisp pixel sprites, miniature health bars, and hit flashes inside the arena.
-  - Fighter shields and custom vector graphics (`self.gfx`) render cleanly around fighters in real-time combat and safely no-op in headless balance runs.
+- **Key User Flows**:
+  1. **Entering a Duel**: The arena initializes with a subtle ambient neon grid, soft fighter under-glows, and a compact `VFX: AUTO` (or `HIGH` / `LOW`) toggle pill in the top corner.
+  2. **Movement, Dashes & Projectiles**: Fast-moving fighters, dashes, and high-velocity projectiles leave fading additive ghost afterimages and ember ribbons.
+  3. **Impacts & Wall Collisions**:
+     - Projectiles and melee strikes emit a directional cone of high-velocity sparks (`fx_spark` stretched along velocity vector), a soft additive glow flare (`fx_glow`), and floating embers.
+     - Wall bounces trigger a localized neon ripple along the arena border wall and deform the nearby grid lines outward before springing back.
+  4. **Heavy Hits, Crits & Knockouts**:
+     - High-damage hits (>25 DMG or >12% max HP) trigger a scaled hit-stop freeze (2–5 ticks), an emphasized gold/crimson popup with an exclamation mark (`!`) and bounce physics, and a double concentric shockwave ring.
+     - Explosions and KOs stamp a persistent dark-charred neon scorch decal onto the floor layer that slowly cools and fades over several seconds.
+  5. **Status & Shield Auras**: Shielded units emit rising cyan hex/sparkle motes, poisoned units bubble with toxic green droplets, slowed units shed frost shards, and stunned units display orbiting star sparks.
+  6. **HUD Card Reactive Feedback**: Player HUD cards on the sides/bottom of the screen subtly shake when their fighter takes heavy damage and feature a smooth white "damage trail" bar behind the segmented HP bar so players can visually gauge chunk damage.
+
+- **Visual Identity & Theme**:
+  - *Aesthetic Direction*: Crisp HD Retro-Arcade Neon (`Press Start 2P` pixel typography paired with multi-layered additive WebGL light and particle physics).
+  - *Color Palette & Mood*:
+    - **60% Dominant Arena Canvas**: Deep Obsidian Void (`#07070C`) and Arena Slate (`#12121E`) so additive particles pop with maximum contrast.
+    - **30% Structural Surfaces**: Crisp grid lines (`#1C1C2E`), titanium corner guards (`#2A2A40`), and dark slate fighter HUD cards (`#0D0D16`).
+    - **10% High-Intent Accents & Additive FX**: Pure White (`#FFFFFF`) super-heated cores, Cyber Cyan (`#00E5FF`) shields/ripples, Solar Gold (`#FFDD00`) heavy/critical hits, Toxic Emerald (`#00FF66`) poison, and Crimson Alert (`#FF0055`) damage flashes.
+  - *Typography & Hierarchy*: High-DPI (`resolution: 2`) pixel-art numerals (`0–9`, `-`, `+`, `!`) pre-baked into GPU textures for zero-overhead damage, heal, and critical hit popups.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Backward-Compatible Normalization in `MinitContract`**
-  - *Chosen Approach*: `validateAndSanitizeMinit` preserves `minit.action` for existing Minits while normalizing `minit.actions` (an array of ability slots), `minit.movement`, `minit.passive`, `minit.initialState`, and `minit.hooks`.
-  - *Why*: Every existing Minit (`laser`, `pulsar`, `absorb`, `waves`, `moth`, `murasaki`, `ironmen`, `saitama`, and saved custom Minits) continues to work without breaking changes.
-- **Decision 2: Unified Combat Actor Model for Fighters & Summons**
-  - *Chosen Approach*: Summons, clones, and turrets are managed in `arena.summons` (sharing targetable actor properties `x, y, dx, dy, hp, maxHp, ownerId, team, radius, spr`) and automatically participate in collision, targeting, and cleanup when defeated or when their summoner dies.
-  - *Why*: Allows universal traits (`damageRadiusOnHit`, `modularBeam`, `homingMissile`) and targeting rules (`closest_enemy`, `lowest_hp`, `summons_first`) to interact naturally with summons and clones.
-- **Decision 3: Interceptable Projectile & Barrier Tagging**
-  - *Chosen Approach*: Projectiles spawned via actions or `a.shootProjectile` can be intercepted or reflected by active barrier entities (`isBarrier: true`, `blocksProjectiles: true`, `reflectProjectiles: true`).
-  - *Why*: Enables wind-walls, orbital energy shields, and reflect-parry mechanics across any matchup.
+- **Decision 1: Pre-Baked Procedural FX Textures + Additive Blend Layer (`BLEND_MODES.ADD`)**
+  - *Chosen Approach*: Bake specialized procedural textures (`fx_spark`, `fx_glow`, `fx_ember`, `fx_scorch`, `fx_ring_thin`, `fx_star`, `digit_plus`, `digit_bang`) at startup in `AssetBaker` and render light-emitting particles in a dedicated additive container (`PIXI.BLEND_MODES.ADD`), while rendering floor scorch decals and ghost trails in an under-unit decal layer.
+  - *Why*: WebGL `Filter` shaders (like `BloomFilter` or `BlurFilter`) require full-screen render-target passes every frame that hurt mobile fill-rate. Pre-baked radial glow textures combined with `BLEND_MODES.ADD` achieve authentic neon bloom in a single batched draw call at 0ms extra GPU shader cost.
+  - *Alternatives Considered*: Full-scene `PIXI.BlurFilter` post-processing, which degrades performance on mobile GPUs and blurs crisp pixel art.
+
+- **Decision 2: Auto-Adaptive Particle Governor with Manual Override (`AUTO` / `HIGH` / `LOW`)**
+  - *Chosen Approach*: Track a rolling 30-frame FPS average inside the VFX manager. In `AUTO` mode, particle emission multiplier smoothly scales between `1.0x` (at 58+ FPS) and `0.35x` (if FPS drops below 50), prioritizing critical gameplay cues (damage numbers, shockwaves, beams) over decorative ambient dust. Users can also click the compact `VFX: AUTO/HIGH/LOW` button to lock their preference.
+  - *Why*: Guarantees smooth 60 FPS gameplay across all devices while letting desktop players enjoy maximum particle density.
+
+- **Decision 3: Reactive Grid & Wall Ripple Geometry via Sparse Displacement**
+  - *Chosen Approach*: Subdivide arena grid lines into lightweight vertex segments that displace radially away from shockwaves, explosions, and wall bounces using fast spring-damper math, redrawing only when active ripples exist (`activeRipples.length > 0`).
+  - *Why*: Delivers a Geometry-Wars-style reactive arena floor that makes impacts feel grounded in the environment, with zero CPU cost when the grid is at rest.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 4. Technical Architecture & Data Strategy *(Technical Reference)*
 
-```text
+### Architecture & Rendering Layer Diagram
+
+```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    UNIVERSAL MINIT DEFINITION (.JS)                     │
-│  • Identity & Stats : hp, speed, shield, armor, energy, maxEnergy       │
-│  • Movement AI      : 'wander' | 'chase' | 'kite' | 'orbit' | 'custom'  │
-│  • Ability Slots    : action (single) OR actions: [ slot1, slot2, ... ] │
-│  • Lifecycle Hooks  : onInit, onTick, onMove, onBeforeDamaged,          │
-│                       onDamaged, onDealDamage, onBeforeDeath, onDeath   │
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │ Validated & Registered
-                                     ▼
+│                       SimulationScene & HUD Layer                       │
+│  ┌──────────────────────┐  ┌──────────────────────┐  ┌───────────────┐  │
+│  │ P1 & P2 Fighter Cards│  │ Arena Viewport (aG)  │  │ VFX Quality   │  │
+│  │ • Segmented HP Bar   │  │ • Hit-Stop Controller│  │ Toggle Button │  │
+│  │ • White Damage Trail │  │ • Directional Shake  │  │ (AUTO/HI/LOW) │  │
+│  │ • Card Hit Jolt      │  └──────────┬───────────┘  └───────┬───────┘  │
+└──┴──────────────────────┴─────────────┼──────────────────────┼──────────┘
+                                        ▼                      ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                     60HZ ARENA SIMULATION PIPELINE                      │
+│                     Arena Multi-Pass Render Hierarchy                   │
 │                                                                         │
-│  1. Fighter Tick & Statuses (stunTicks, invulnTicks, shield decay/regen)│
-│  2. Movement Controller (AI Steering / Kite / Orbit / Custom onMove)    │
-│  3. Multi-Slot Ability Scheduler (Cooldowns, Energy Costs, Conditions)  │
-│  4. Summon / Clone / Turret AI & Action Loop (arena.summons)            │
-│  5. Entity & Barrier ECS Loop (Projectiles vs. Barriers/Summons/Players)│
-│  6. Damage & Death Pipeline (onBeforeDamaged -> Shield/Armor ->         │
-│                              onDamaged -> onBeforeDeath -> Revive/KO)   │
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │ Powered by
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        MINIT SDK HELPER TOOLKIT                         │
-│  • Combat  : shootProjectile, fireBeam, dealAreaDamage, heal, addShield │
-│  • Units   : spawnSummon, spawnClone, spawnTurret, spawnBarrier         │
-│  • Motion  : teleport, dash, steerToward, orbitAround, applyKnockback   │
-│  • State   : setPhase, transform, applyStatus, spawnVfx, playSound      │
+│  1. Floor & Reactive Grid Layer (`gridGfx`)                             │
+│     └── Dynamic spring-displaced grid vertices + Wall impact ripples    │
+│  2. Under-Unit Decal & Trail Layer (`fxU`)                              │
+│     └── Fading floor scorch marks (`fx_scorch`) + Ghost afterimages     │
+│  3. Main Actor & Entity Layer (`layer` / `summonLayer`)                 │
+│     └── Fighters, Summons, Projectiles (with velocity squash/stretch)   │
+│  4. Unit Overlay Layer (`unitOverlayGfx`)                               │
+│     └── Hexagonal/pulsing shields, barriers, stun stars, mini HP bars   │
+│  5. Additive Bloom & Beam Layer (`fxAdd` / `beamRenderer`)              │
+│     └── `BLEND_MODES.ADD` directional sparks, glow halos, laser arcs    │
+│  6. Combat Text Popup Layer (`fxO`)                                     │
+│     └── Bouncy damage numbers, heavy/crit `!` badges, green `+` heals   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Interactive Component & State Mapping**:
-  - **Damage Interception & Revive Pipeline**: When `arena.damagePlayer(targetId, payload, color, attackerId)` is called:
-    1. Checks `target.invulnTicks > 0` (ignores damage if invulnerable).
-    2. Invokes `target.def.hooks.onBeforeDamaged(target, dmgContext, arena)`—allowing the hook to modify `dmgContext.dmg`, cancel the hit (`dmgContext.cancel = true`), or trigger a counter-attack.
-    3. Applies `target.def.stats.armor` (flat or % mitigation) and absorbs damage against `target.shield` before reducing `target.hp`.
-    4. Invokes `attacker.def.hooks.onDealDamage` and `target.def.hooks.onDamaged`.
-    5. If `target.hp <= 0`, invokes `target.def.hooks.onBeforeDeath(target, arena)`—if the hook heals `target.hp > 0` (e.g., Phoenix revive or Second Boss Phase), death is canceled and the fight continues!
-  - **Expanded Starter Template**: Clicking **`Template .JS`** in the Dev modal downloads a richly commented template demonstrating declarative stats/movement, multi-slot `actions`, `hooks` (`onTick`, `onBeforeDamaged`, `onBeforeDeath`), and `SDK` calls (`spawnSummon`, `spawnBarrier`, `shootProjectile`).
+### Data Model & Pool Architecture
+
+- **Pre-Allocated VFX Pools (O(1) Swap-and-Pop)**:
+  - **Physics & Spark Pool (`phys`)**: Expanded to 600 pre-allocated sprites supporting velocity-aligned rotation (`alignToVel`), anisotropic stretching (long spark streaks that shorten as they slow down), gravity/buoyancy (`grav`), angular spin (`vRot`), additive blending (`BLEND_MODES.ADD`), and color tinting.
+  - **Afterimage & Scorch Decal Pool (`decals`)**: 120 pre-allocated sprites on the under-unit layer for fighter dash ghosts, projectile motion ribbons, and persistent explosion scorch marks.
+  - **Multi-Ring Shockwave Pool (`sws`)**: 32 pre-allocated ring sprites supporting dual-ring staggered bursts (fast thin outer ring + slower bright inner ring).
+  - **Elastic Damage & Heal Text Pool (`txts`)**: 45 pre-allocated multi-glyph containers supporting `-`, `+`, `0–9`, and `!` glyphs with arc-bounce physics and critical-hit scale pops.
+- **Reactive Arena Grid State (`gridRipples`)**:
+  - Ring-buffer of up to 12 active ripple impulses `{ x, y, radius, maxRadius, strength, color, life, maxLife }` triggered automatically on `spawnShockwave`, `onWallBounce`, and knockouts.
+- **Headless Determinism Guarantee**:
+  - `HEADLESS_FX_POOL` exposes no-op stubs for all new VFX methods (`spawnSparkBurst`, `spawnAfterimage`, `spawnScorch`, `spawnGlow`, `spawnGridRipple`, `spawnHealText`) so headless 1,000-match balance simulations run at maximum speed with zero visual overhead.

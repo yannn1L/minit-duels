@@ -213,22 +213,26 @@ export const MinitSDK = {
 
     if (!arena.isHeadless) {
       const col = options.color || actor.def?.color || 0x00e5ff;
-      arena.fxPool.spawnShockwave(oldPx, oldPy, col, options.shockRad || 45, 3);
-      arena.fxPool.spawnShockwave(newPx, newPy, col, options.shockRad || 55, 3);
-      for (let i = 0; i < (options.particleCount ?? 8); i++) {
-        arena.fxPool.spawnPhysics(
-          options.particleTex || 'fx_spark',
-          newPx,
-          newPy,
-          FastMath.randRange(-3, 3),
-          FastMath.randRange(-3, 3),
-          12,
-          0.88,
-          0.88,
-          true,
-          col
+      if (actor.spr?.texture) {
+        arena.fxPool.spawnAfterimage(
+          actor.spr.texture,
+          oldPx,
+          oldPy,
+          actor.spr.scale.x,
+          actor.spr.scale.y,
+          actor.spr.rotation,
+          col,
+          0.65,
+          18,
+          true
         );
       }
+      arena.fxPool.spawnShockwave(oldPx, oldPy, col, options.shockRad || 45, 3);
+      arena.fxPool.spawnShockwave(newPx, newPy, col, options.shockRad || 55, 3);
+      if (arena.spawnGridRipple) {
+        arena.spawnGridRipple(newPx, newPy, options.shockRad || 55, 4.5, col);
+      }
+      arena.fxPool.spawnSparkBurst(newPx, newPy, null, col, options.particleCount ?? 8, 3.2, Math.PI, 16);
       if (options.sound) AudioSys.play(options.sound, 0.5);
       if (actor.spr) {
         actor.spr.x = newPx;
@@ -257,11 +261,25 @@ export const MinitSDK = {
 
     const bS = actor.baseScale || 1.0;
     if (actor.aS) {
-      actor.aS.tX = bS * 1.35;
-      actor.aS.tY = bS * 0.75;
+      actor.aS.tX = bS * 1.38;
+      actor.aS.tY = bS * 0.72;
     }
-    if (!arena.isHeadless && options.sound) {
-      AudioSys.play(options.sound, 0.6);
+    if (!arena.isHeadless) {
+      const pX = actor.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      const pY = actor.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      arena.fxPool.spawnSparkBurst(
+        pX,
+        pY,
+        angle + Math.PI,
+        actor.def?.color || 0x00e5ff,
+        5,
+        2.8,
+        0.65,
+        14
+      );
+      if (options.sound) {
+        AudioSys.play(options.sound, 0.6);
+      }
     }
   },
 
@@ -336,7 +354,7 @@ export const MinitSDK = {
             hitVfx: options.hitVfx || owner.def?.payload?.hitVfx || {
               shake: 3,
               flash: 0.1,
-              particleCount: 5,
+              particleCount: 6,
               sound: 'hit',
               playSound: true
             },
@@ -410,8 +428,13 @@ export const MinitSDK = {
     const pY = y * CFG.GRID.TS + CFG.GRID.HALF_TS;
 
     if (!arena.isHeadless) {
+      const shockRad = options.shockRad || radius * CFG.GRID.TS * 2.2;
       if (options.shockwave !== false) {
-        arena.fxPool.spawnShockwave(pX, pY, color, options.shockRad || radius * CFG.GRID.TS * 2.2, 4);
+        arena.fxPool.spawnShockwave(pX, pY, color, shockRad, 4);
+      }
+      arena.fxPool.spawnScorch(pX, pY, color, Math.min(1.6, radius * 0.55), 210);
+      if (arena.spawnGridRipple) {
+        arena.spawnGridRipple(pX, pY, shockRad, 6.0, color);
       }
       if (options.sound) {
         AudioSys.play(options.sound, 0.7);
@@ -429,7 +452,7 @@ export const MinitSDK = {
             hitVfx: options.hitVfx || {
               shake: 5,
               flash: 0.15,
-              particleCount: 6,
+              particleCount: 7,
               sound: 'hit',
               playSound: true
             },
@@ -455,7 +478,14 @@ export const MinitSDK = {
     if (healed >= 1 && !arena.isHeadless && options.showText !== false) {
       const pX = actor.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
       const pY = actor.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
-      arena.fxPool.spawnDmgText(pX, pY, healed, options.color || 0x00ff66, 0.95);
+      arena.fxPool.spawnDmgText(pX, pY, healed, options.color || 0x00ff66, 0.95, {
+        isHeal: true
+      });
+      arena.fxPool.spawnPhysics('fx_star', pX, pY - 4, 0, -1.2, 16, 0.92, 0.92, true, 0x00ff66, 0.9, {
+        additive: true,
+        grav: -0.05,
+        scale: 0.75
+      });
     }
     return healed;
   },

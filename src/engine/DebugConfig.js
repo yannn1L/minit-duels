@@ -9,6 +9,7 @@ const DEFAULT_DEBUG_STATE = {
   showVectors: true,
   showCooldowns: true,
   showTelemetry: true,
+  vfxQuality: 'auto', // 'auto' | 'high' | 'low'
   timeScale: 1.0,
   paused: false,
   stepRequested: false
@@ -51,6 +52,14 @@ class DebugConfigManager {
         fn(this.state);
       } catch (e) {}
     });
+  }
+
+  cycleVfxQuality() {
+    const order = ['auto', 'high', 'low'];
+    const cur = this.state.vfxQuality || 'auto';
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    this.update({ vfxQuality: next });
+    return next;
   }
 
   subscribe(fn) {

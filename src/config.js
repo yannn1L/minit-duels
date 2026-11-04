@@ -183,18 +183,21 @@ export const CFG = {
 
   // Particle Effects Limits (Tweakable)
   VFX: {
-    TEXT_LIMIT: 40,
-    PHYSICS_LIMIT: 400,
+    TEXT_LIMIT: 48,
+    PHYSICS_LIMIT: 600,
+    DECAL_LIMIT: 140,
+    SHOCKWAVE_LIMIT: 36,
+    CRIT_DMG_THRESHOLD: 24,
     DMG_TEXT: {
-      LIFE: 35,
-      VY: -3.5,
-      VX_SPREAD: 1.0,
+      LIFE: 38,
+      VY: -3.8,
+      VX_SPREAD: 1.25,
       FLOAT_DRAG: 0.9,
       CHAR_SPACING: 13
     },
-    HIT: { PARTICLE_COUNT: 4, BURST_FORCE: 2.5, LIFE: 20, DEFAULT_TEX: 'fx_dust' },
+    HIT: { PARTICLE_COUNT: 7, BURST_FORCE: 3.4, LIFE: 22, DEFAULT_TEX: 'fx_spark' },
     ZONE: { PARTICLE_RATE: 2 },
-    DEATH: { SHOCK_RAD: 120, PARTICLE_COUNT: 24, BURST_FORCE: 6, PARTICLE_LIFE: 35 }
+    DEATH: { SHOCK_RAD: 135, PARTICLE_COUNT: 36, BURST_FORCE: 7.2, PARTICLE_LIFE: 42 }
   }
 };
 

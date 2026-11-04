@@ -17,11 +17,16 @@ const NOOP_FN = () => {};
 const HEADLESS_FX_POOL = {
   initTex: NOOP_FN,
   spawnPhysics: NOOP_FN,
+  spawnSparkBurst: NOOP_FN,
+  spawnGlow: NOOP_FN,
+  spawnAfterimage: NOOP_FN,
+  spawnScorch: NOOP_FN,
   spawnShockwave: NOOP_FN,
   spawnDmgText: NOOP_FN,
+  getBudgetMult: () => 1.0,
   update: NOOP_FN,
-  act: { phys: [], sws: [], txts: [] },
-  pool: { phys: [], sws: [], txts: [] }
+  act: { phys: [], sws: [], txts: [], decals: [] },
+  pool: { phys: [], sws: [], txts: [], decals: [] }
 };
 const HEADLESS_BEAM_RENDERER = {
   renderBeam: NOOP_FN,
@@ -56,11 +61,16 @@ export class Arena extends PIXI.Container {
     this.textures = texturesRef || {};
     this.isHeadless = Boolean(options.headless);
     this.shake = 0;
+    this.shakeDirX = 0;
+    this.shakeDirY = 0;
     this.hitStop = 0;
     this.totalTicks = 0;
     this.combatLog = [];
     this.summons = [];
     this._summonCounter = 0;
+    this.gridRipples = [];
+    this.wallRipples = [];
+    this._gridDirty = true;
     this.SDK = MinitSDK;
 
     const AW = CFG.GRID.COLS * CFG.GRID.TS;
@@ -100,18 +110,16 @@ export class Arena extends PIXI.Container {
       this.layer.mask = mask;
       this.view.addChild(this.layer);
 
-      // Grid Floor
-      const grid = new PIXI.Graphics().lineStyle(1, CFG.ARENA.GRID_COLOR, CFG.ARENA.GRID_ALPHA);
-      for (let x = 1; x < CFG.GRID.COLS; x++) {
-        grid.moveTo(x * CFG.GRID.TS, 0).lineTo(x * CFG.GRID.TS, AH);
-      }
-      for (let y = 1; y < CFG.GRID.ROWS; y++) {
-        grid.moveTo(0, y * CFG.GRID.TS).lineTo(AW, y * CFG.GRID.TS);
-      }
-      this.layer.addChild(grid);
+      // Reactive Grid Floor & Wall Ripple Graphics
+      this.gridGfx = new PIXI.Graphics();
+      this.layer.addChild(this.gridGfx);
+      this._renderReactiveGrid(1.0);
 
       this.fxU = new PIXI.Container();
       this.layer.addChild(this.fxU);
+
+      this.unitGlowLayer = new PIXI.Container();
+      this.layer.addChild(this.unitGlowLayer);
 
       this.summonLayer = new PIXI.Container();
       this.layer.addChild(this.summonLayer);
@@ -124,11 +132,21 @@ export class Arena extends PIXI.Container {
     pIds.forEach((id, idx) => {
       const md = MinitEngine.Registry.getMinit(id) || MinitEngine.Registry.minits[id];
       let spr;
+      let glowSpr = null;
       if (!this.isHeadless) {
         const tex = this.textures[`minit_${id}_base`];
         spr = new PIXI.Sprite(tex || PIXI.Texture.WHITE);
         spr.anchor.set(0.5);
         this.layer.addChild(spr);
+
+        if (this.textures['fx_glow']) {
+          glowSpr = new PIXI.Sprite(this.textures['fx_glow']);
+          glowSpr.anchor.set(0.5);
+          glowSpr.blendMode = PIXI.BLEND_MODES.ADD;
+          glowSpr.tint = md.color || 0x00e5ff;
+          glowSpr.alpha = 0.42;
+          this.unitGlowLayer.addChild(glowSpr);
+        }
       } else {
         spr = createDummySprite();
       }
@@ -175,10 +193,12 @@ export class Arena extends PIXI.Container {
         t: 0,
         actionSlots: this._buildActionSlots(clonedDef),
         spr,
+        glowSpr,
         baseScale: initialScale,
         dmgMult: 1.0,
         aS: { x: initialScale, y: initialScale, tX: initialScale, tY: initialScale },
         fT: 0,
+        hudJolt: 0,
         stunTicks: 0,
         slowTicks: 0,
         slowMult: 0.5,
@@ -603,15 +623,31 @@ export class Arena extends PIXI.Container {
     const pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
     const vfx = payload.hitVfx || {};
 
+    const isCrit =
+      totalEffectiveDmg >= (CFG.VFX.CRIT_DMG_THRESHOLD || 24) ||
+      totalEffectiveDmg >= (p.maxHp || 1000) * 0.11;
+
+    // Trigger HUD card jolt on main fighters
+    if (!p.isSummon) {
+      p.hudJolt = Math.min(12, Math.max(p.hudJolt || 0, isCrit ? 8 : 3.5));
+    }
+
     if (!this.isHeadless) {
       const popupColor = shieldAbsorbed > 0 && actualHpDmg === 0 ? 0x00e5ff : fxC;
       if (vfx.showText !== false) {
-        this.fxPool.spawnDmgText(pX, pY, totalEffectiveDmg, popupColor, vfx.textScale || 1.0);
+        this.fxPool.spawnDmgText(pX, pY, totalEffectiveDmg, popupColor, vfx.textScale || 1.0, {
+          isCrit
+        });
       }
       if (vfx.playSound !== false) {
-        AudioSys.play(vfx.sound || 'hit', 0.6);
+        AudioSys.play(vfx.sound || 'hit', isCrit ? 0.8 : 0.6);
       }
     }
+
+    // Impact direction angle (from attacker toward victim)
+    const hitAngle = attacker
+      ? FastMath.angle(attacker.x, attacker.y, p.x, p.y)
+      : FastMath.randRange(0, FastMath.TWO_PI);
 
     if (payload.knockback) {
       const kb = payload.knockback;
@@ -623,36 +659,58 @@ export class Arena extends PIXI.Container {
         force: kb.force ?? 0.7,
         shake: kb.shake ?? vfx.shake ?? 6
       });
+    } else if (totalEffectiveDmg >= 12) {
+      // Subtle micro-nudge along hit direction for tactile impact
+      const nudge = Math.min(0.28, totalEffectiveDmg * 0.005);
+      p.x = FastMath.clamp(p.x + Math.cos(hitAngle) * nudge, CFG.ARENA_BOUNDS.MIN_X, CFG.ARENA_BOUNDS.MAX_X);
+      p.y = FastMath.clamp(p.y + Math.sin(hitAngle) * nudge, CFG.ARENA_BOUNDS.MIN_Y, CFG.ARENA_BOUNDS.MAX_Y);
     }
 
     const bS = p.baseScale || 1.0;
     if (p.aS) {
-      p.aS.tX = bS * CFG.JUICE.HIT.tX;
-      p.aS.tY = bS * CFG.JUICE.HIT.tY;
+      const hitStretch = isCrit ? 1.45 : CFG.JUICE.HIT.tX;
+      const hitSquash = isCrit ? 0.72 : 0.86;
+      p.aS.tX = bS * hitStretch;
+      p.aS.tY = bS * hitSquash;
     }
 
     if (!this.isHeadless) {
       if (p.fT <= 0) p.fT = vfx.unitFlashDur ?? CFG.JUICE.HIT_FLASH_DUR;
-      if (vfx.shake) this.shake = Math.max(this.shake, vfx.shake);
+      const targetShake = vfx.shake ?? (isCrit ? 6 : 2.5);
+      if (targetShake > 0) {
+        this.shake = Math.max(this.shake, targetShake);
+        this.shakeDirX = Math.cos(hitAngle);
+        this.shakeDirY = Math.sin(hitAngle);
+      }
       if (vfx.flash) this.triggerFlash(vfx.flash);
-      if (vfx.hitStop) this.hitStop = Math.max(this.hitStop, vfx.hitStop);
+
+      // Dynamic hit-stop freeze on heavy hits
+      const dynamicHitStop = vfx.hitStop ?? (isCrit ? 3 : 0);
+      if (dynamicHitStop > 0) {
+        this.hitStop = Math.max(this.hitStop, dynamicHitStop);
+      }
 
       const pC = vfx.particleCount ?? CFG.VFX.HIT.PARTICLE_COUNT;
-      for (let i = 0; i < pC; i++) {
-        const vx = FastMath.randRange(-CFG.VFX.HIT.BURST_FORCE, CFG.VFX.HIT.BURST_FORCE);
-        const vy = FastMath.randRange(-CFG.VFX.HIT.BURST_FORCE, CFG.VFX.HIT.BURST_FORCE);
-        this.fxPool.spawnPhysics(
-          vfx.particleTex || CFG.VFX.HIT.DEFAULT_TEX,
+      if (pC > 0) {
+        // Directional spark cone + core glow burst
+        this.fxPool.spawnSparkBurst(
           pX,
           pY,
-          vx,
-          vy,
-          CFG.VFX.HIT.LIFE,
-          0.9,
-          0.9,
-          true,
-          fxC
+          hitAngle,
+          shieldAbsorbed > 0 && actualHpDmg === 0 ? 0x00e5ff : fxC,
+          isCrit ? Math.round(pC * 1.4) : pC,
+          isCrit ? CFG.VFX.HIT.BURST_FORCE * 1.3 : CFG.VFX.HIT.BURST_FORCE,
+          0.95,
+          CFG.VFX.HIT.LIFE
         );
+      }
+
+      // Heavy hits ripple the arena grid & leave a light scorch mark
+      if (isCrit) {
+        this.spawnGridRipple(pX, pY, 56, 4.5, fxC);
+        if (totalEffectiveDmg >= 35) {
+          this.fxPool.spawnScorch(pX, pY, fxC, 0.75, 160);
+        }
       }
     }
 
@@ -681,6 +739,7 @@ export class Arena extends PIXI.Container {
         if (!this.isHeadless) {
           this.logCombatEvent(`${p.def.name} revived!`);
           this.fxPool.spawnShockwave(pX, pY, p.def.color, 95, 5);
+          this.spawnGridRipple(pX, pY, 95, 7, p.def.color);
         }
         return;
       }
@@ -696,34 +755,30 @@ export class Arena extends PIXI.Container {
         }
         const dVfx = p.def.deathVfx || {};
         AudioSys.play(dVfx.sound || (p.isSummon ? 'hit' : 'crush'));
-        if (!p.isSummon && dVfx.flash) this.triggerFlash(dVfx.flash);
-        if (dVfx.shake) this.shake = Math.max(this.shake, p.isSummon ? 4 : dVfx.shake);
+        if (!p.isSummon) {
+          this.triggerFlash(dVfx.flash || CFG.JUICE.DEATH_FLASH_INTENSITY);
+        }
+        this.shake = Math.max(this.shake, p.isSummon ? 4 : dVfx.shake || CFG.JUICE.DEATH_SHAKE);
         if (!p.isSummon) {
           this.hitStop = Math.max(this.hitStop, dVfx.hitStop || CFG.JUICE.DEATH_HIT_STOP);
         }
-        this.fxPool.spawnShockwave(
+
+        const koRad = p.isSummon ? 45 : dVfx.shockRad || CFG.VFX.DEATH.SHOCK_RAD;
+        this.fxPool.spawnShockwave(pX, pY, p.def.color, koRad, p.isSummon ? 3 : 6);
+        this.fxPool.spawnScorch(pX, pY, p.def.color, p.isSummon ? 0.8 : 1.45, 320);
+        this.spawnGridRipple(pX, pY, koRad, p.isSummon ? 4 : 9.5, p.def.color);
+
+        const dpC = p.isSummon ? 10 : (dVfx.particleCount ?? CFG.VFX.DEATH.PARTICLE_COUNT);
+        this.fxPool.spawnSparkBurst(
           pX,
           pY,
+           null,
           p.def.color,
-          p.isSummon ? 45 : dVfx.shockRad || CFG.VFX.DEATH.SHOCK_RAD,
-          p.isSummon ? 3 : 6
+          dpC,
+          CFG.VFX.DEATH.BURST_FORCE,
+          Math.PI,
+          CFG.VFX.DEATH.PARTICLE_LIFE
         );
-
-        const dpC = p.isSummon ? 8 : (dVfx.particleCount ?? CFG.VFX.DEATH.PARTICLE_COUNT);
-        for (let i = 0; i < dpC; i++) {
-          this.fxPool.spawnPhysics(
-            CFG.VFX.HIT.DEFAULT_TEX,
-            pX,
-            pY,
-            FastMath.randRange(-CFG.VFX.DEATH.BURST_FORCE, CFG.VFX.DEATH.BURST_FORCE),
-            FastMath.randRange(-CFG.VFX.DEATH.BURST_FORCE, CFG.VFX.DEATH.BURST_FORCE),
-            CFG.VFX.DEATH.PARTICLE_LIFE,
-            0.9,
-            0.9,
-            true,
-            p.def.color
-          );
-        }
       }
     }
   }
@@ -731,6 +786,48 @@ export class Arena extends PIXI.Container {
   // Backward-compatible wrapper used by existing Minit traits
   damagePlayer(pid, payload = {}, fxC) {
     return this.damageActor(pid, payload, fxC);
+  }
+
+  /**
+   * Triggers a radial spring-displacement ripple across the arena floor grid.
+   */
+  spawnGridRipple(px, py, maxRadius = 75, strength = 5.5, color = 0x00e5ff) {
+    if (this.isHeadless) return;
+    if (!this.gridRipples) this.gridRipples = [];
+    if (this.gridRipples.length >= 10) {
+      this.gridRipples.shift();
+    }
+    this.gridRipples.push({
+      x: px,
+      y: py,
+      r: 4,
+      maxR: maxRadius,
+      strength,
+      color,
+      life: 24,
+      maxLife: 24
+    });
+    this._gridDirty = true;
+  }
+
+  /**
+   * Triggers a glowing impact wave along an arena border wall (`'left' | 'right' | 'top' | 'bottom'`).
+   */
+  spawnWallRipple(wallSide, px, py, color = 0x00e5ff) {
+    if (this.isHeadless) return;
+    if (!this.wallRipples) this.wallRipples = [];
+    if (this.wallRipples.length >= 8) {
+      this.wallRipples.shift();
+    }
+    this.wallRipples.push({
+      side: wallSide,
+      x: px,
+      y: py,
+      color,
+      life: 18,
+      maxLife: 18
+    });
+    this._gridDirty = true;
   }
 
   executeAction(owner, tgt, slot = null) {
@@ -745,6 +842,13 @@ export class Arena extends PIXI.Container {
     }
     if (!this.isHeadless && !owner.isSummon) {
       this.logCombatEvent(`${owner.def.name} used ${act.name || 'ability'}`);
+    }
+
+    // Subtle ability cast burst
+    if (!this.isHeadless) {
+      const oX = owner.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      const oY = owner.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      this.fxPool.spawnGlow(oX, oY, owner.def.color, 0.75, 10, 0.45);
     }
 
     // Invoke custom `onExecute` on the slot or `onAction` hook on the Minit
@@ -782,7 +886,8 @@ export class Arena extends PIXI.Container {
     }
   }
 
-  update(tS) {
+  update(tS, currentFps = 60) {
+    this.currentFps = currentFps;
     if (this.hitStop > 0) {
       this.hitStop -= tS;
     } else {
@@ -804,10 +909,73 @@ export class Arena extends PIXI.Container {
     if (p.hp <= 0) return;
     if (p.activeStatuses) p.activeStatuses.clear();
 
-    // Status timer countdowns
-    if (p.stunTicks > 0) p.stunTicks--;
-    if (p.slowTicks > 0) p.slowTicks--;
+    // Status timer countdowns & status icon registration
+    if (p.stunTicks > 0) {
+      p.stunTicks--;
+      if (p.activeStatuses) p.activeStatuses.add('icon_stun');
+    }
+    if (p.slowTicks > 0) {
+      p.slowTicks--;
+      if (p.activeStatuses) p.activeStatuses.add('icon_slow');
+    }
     if (p.invulnTicks > 0) p.invulnTicks--;
+
+    // Ambient Status Aura Particles (Shield, Slow, Stun)
+    if (!this.isHeadless && this.totalTicks % 5 === 0) {
+      const pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      const pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+
+      if (p.shield > 0 && this.totalTicks % 10 === 0) {
+        const ang = FastMath.randRange(0, FastMath.TWO_PI);
+        this.fxPool.spawnPhysics(
+          'fx_star',
+          pX + Math.cos(ang) * 11,
+          pY + Math.sin(ang) * 11,
+          0,
+          -0.65,
+          14,
+          0.95,
+          0.95,
+          true,
+          0x00e5ff,
+          0.75,
+          { additive: true, grav: -0.04, scale: 0.55 }
+        );
+      }
+      if (p.slowTicks > 0) {
+        this.fxPool.spawnPhysics(
+          'fx_shard',
+          pX + FastMath.randRange(-7, 7),
+          pY + FastMath.randRange(-5, 5),
+          FastMath.randRange(-0.4, 0.4),
+          0.55,
+          14,
+          0.95,
+          0.95,
+          true,
+          0x00ccff,
+          0.8,
+          { additive: true, grav: 0.05, scale: 0.65 }
+        );
+      }
+      if (p.stunTicks > 0) {
+        const starAng = this.totalTicks * 0.25;
+        this.fxPool.spawnPhysics(
+          'fx_star',
+          pX + Math.cos(starAng) * 9,
+          pY - 10 + Math.sin(starAng) * 3,
+          0,
+          -0.2,
+          8,
+          1,
+          1,
+          true,
+          0xffdd00,
+          0.95,
+          { additive: true, grav: 0, scale: 0.65 }
+        );
+      }
+    }
 
     // Shield & Energy regeneration
     if (p.def.stats.shieldRegen && p.shield < (p.maxShield || p.def.stats.maxShield || 0)) {
@@ -832,27 +1000,74 @@ export class Arena extends PIXI.Container {
     // Execute Pluggable Movement AI
     executeMovementAI(p, this);
 
+    // Emit ghost afterimage trails during dashes or high-velocity knockbacks
+    const curSpd = Math.hypot(p.dx, p.dy);
+    if (
+      !this.isHeadless &&
+      p.spr?.texture &&
+      (p.dashTicks > 0 || curSpd > (p.def.stats.speed || 0.12) * 1.45) &&
+      this.totalTicks % 2 === 0
+    ) {
+      this.fxPool.spawnAfterimage(
+        p.spr.texture,
+        p.spr.x || p.x * CFG.GRID.TS + CFG.GRID.HALF_TS,
+        p.spr.y || p.y * CFG.GRID.TS + CFG.GRID.HALF_TS,
+        p.spr.scale.x,
+        p.spr.scale.y,
+        p.spr.rotation,
+        p.def.color || 0x00e5ff,
+        0.42,
+        11,
+        true
+      );
+    }
+
     const bS = p.baseScale || 1.0;
 
-    // Arena Boundary Collisions & `onWallBounce` Hook
+    // Arena Boundary Collisions, Wall Impact Ripples & `onWallBounce` Hook
     if (p.x < CFG.ARENA_BOUNDS.MIN_X || p.x > CFG.ARENA_BOUNDS.MAX_X) {
+      const hitLeft = p.x < CFG.ARENA_BOUNDS.MIN_X;
       p.x = FastMath.clamp(p.x, CFG.ARENA_BOUNDS.MIN_X, CFG.ARENA_BOUNDS.MAX_X);
       p.dx *= CFG.PHYSICS.BOUNCE;
       if (p.aS) {
-        p.aS.tX = bS * CFG.JUICE.BOUNCE_X.tX;
-        p.aS.tY = bS * CFG.JUICE.BOUNCE_X.tY;
+        p.aS.tX = bS * 0.76;
+        p.aS.tY = bS * 1.28;
       }
-      if (!this.isHeadless && !p.isSummon) AudioSys.play('hit', 0.2);
+      if (!this.isHeadless && !p.isSummon) {
+        AudioSys.play('hit', 0.2);
+        const wX = hitLeft ? 0 : CFG.GRID.COLS * CFG.GRID.TS;
+        const wY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+        this.spawnWallRipple(hitLeft ? 'left' : 'right', wX, wY, p.def.color);
+        this.spawnGridRipple(wX, wY, 42, 3.2, p.def.color);
+        this.fxPool.spawnSparkBurst(wX, wY, hitLeft ? 0 : Math.PI, p.def.color, 4, 2.4, 0.85, 14);
+      }
       invokeMinitHook(p, 'onWallBounce', 'x', this);
     }
     if (p.y < CFG.ARENA_BOUNDS.MIN_Y || p.y > CFG.ARENA_BOUNDS.MAX_Y) {
+      const hitTop = p.y < CFG.ARENA_BOUNDS.MIN_Y;
       p.y = FastMath.clamp(p.y, CFG.ARENA_BOUNDS.MIN_Y, CFG.ARENA_BOUNDS.MAX_Y);
       p.dy *= CFG.PHYSICS.BOUNCE;
       if (p.aS) {
-        p.aS.tX = bS * CFG.JUICE.BOUNCE_Y.tX;
-        p.aS.tY = bS * CFG.JUICE.BOUNCE_Y.tY;
+        p.aS.tX = bS * 1.28;
+        p.aS.tY = bS * 0.76;
       }
-      if (!this.isHeadless && !p.isSummon) AudioSys.play('hit', 0.2);
+      if (!this.isHeadless && !p.isSummon) {
+        AudioSys.play('hit', 0.2);
+        const wX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+        const wY = hitTop ? 0 : CFG.GRID.ROWS * CFG.GRID.TS;
+        this.spawnWallRipple(hitTop ? 'top' : 'bottom', wX, wY, p.def.color);
+        this.spawnGridRipple(wX, wY, 42, 3.2, p.def.color);
+        this.fxPool.spawnSparkBurst(
+          wX,
+          wY,
+          hitTop ? Math.PI * 0.5 : -Math.PI * 0.5,
+          p.def.color,
+          4,
+          2.4,
+          0.85,
+          14
+        );
+      }
       invokeMinitHook(p, 'onWallBounce', 'y', this);
     }
 
@@ -926,7 +1141,7 @@ export class Arena extends PIXI.Container {
               en,
               {
                 dmg: s.contactDmg * (s.dmgMult || 1.0),
-                hitVfx: { shake: 2, flash: 0, particleCount: 3, playSound: true }
+                hitVfx: { shake: 2, flash: 0, particleCount: 4, playSound: true }
               },
               s.def.color,
               s
@@ -962,7 +1177,120 @@ export class Arena extends PIXI.Container {
     }
   }
 
+  /**
+   * Renders the reactive arena grid and wall impact ripples.
+   * Only recomputes geometry when active ripples exist (`_gridDirty`).
+   */
+  _renderReactiveGrid(tS) {
+    if (!this.gridGfx) return;
+    const hasRipples = this.gridRipples.length > 0 || this.wallRipples.length > 0;
+    if (!hasRipples && !this._gridDirty) return;
+
+    const AW = CFG.GRID.COLS * CFG.GRID.TS;
+    const AH = CFG.GRID.ROWS * CFG.GRID.TS;
+    const TS = CFG.GRID.TS;
+
+    // Step active floor ripples
+    for (let i = this.gridRipples.length - 1; i >= 0; i--) {
+      const rp = this.gridRipples[i];
+      rp.life -= tS;
+      rp.r += (rp.maxR - rp.r) * 0.22 * tS;
+      if (rp.life <= 0) {
+        this.gridRipples.splice(i, 1);
+      }
+    }
+
+    // Step active wall ripples
+    for (let i = this.wallRipples.length - 1; i >= 0; i--) {
+      const wr = this.wallRipples[i];
+      wr.life -= tS;
+      if (wr.life <= 0) {
+        this.wallRipples.splice(i, 1);
+      }
+    }
+
+    this.gridGfx.clear();
+
+    // Fast path when no ripples are active
+    if (this.gridRipples.length === 0 && this.wallRipples.length === 0) {
+      this.gridGfx.lineStyle(1, CFG.ARENA.GRID_COLOR, CFG.ARENA.GRID_ALPHA);
+      for (let x = 1; x < CFG.GRID.COLS; x++) {
+        this.gridGfx.moveTo(x * TS, 0).lineTo(x * TS, AH);
+      }
+      for (let y = 1; y < CFG.GRID.ROWS; y++) {
+        this.gridGfx.moveTo(0, y * TS).lineTo(AW, y * TS);
+      }
+      this._gridDirty = false;
+      return;
+    }
+
+    // Displaced reactive grid vertices
+    const segStep = 8;
+    const displacePt = (bx, by) => {
+      let ox = bx;
+      let oy = by;
+      for (let r = 0; r < this.gridRipples.length; r++) {
+        const rp = this.gridRipples[r];
+        const dx = bx - rp.x;
+        const dy = by - rp.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const band = Math.abs(d - rp.r);
+        if (band < 24 && d > 0.1) {
+          const env = (1 - band / 24) * (rp.life / rp.maxLife) * rp.strength;
+          ox += (dx / d) * env;
+          oy += (dy / d) * env;
+        }
+      }
+      return { x: ox, y: oy };
+    };
+
+    this.gridGfx.lineStyle(1, CFG.ARENA.GRID_COLOR, CFG.ARENA.GRID_ALPHA);
+    for (let x = 1; x < CFG.GRID.COLS; x++) {
+      const baseX = x * TS;
+      const p0 = displacePt(baseX, 0);
+      this.gridGfx.moveTo(p0.x, p0.y);
+      for (let py = segStep; py <= AH; py += segStep) {
+        const pt = displacePt(baseX, py);
+        this.gridGfx.lineTo(pt.x, pt.y);
+      }
+    }
+    for (let y = 1; y < CFG.GRID.ROWS; y++) {
+      const baseY = y * TS;
+      const p0 = displacePt(0, baseY);
+      this.gridGfx.moveTo(p0.x, p0.y);
+      for (let px = segStep; px <= AW; px += segStep) {
+        const pt = displacePt(px, baseY);
+        this.gridGfx.lineTo(pt.x, pt.y);
+      }
+    }
+
+    // Highlight energized ripple rings on the floor grid
+    for (let r = 0; r < this.gridRipples.length; r++) {
+      const rp = this.gridRipples[r];
+      const alpha = (rp.life / rp.maxLife) * 0.28;
+      this.gridGfx.lineStyle(1.2, rp.color, alpha).drawCircle(rp.x, rp.y, rp.r);
+    }
+
+    // Render glowing wall impact ripples along perimeter borders
+    for (let w = 0; w < this.wallRipples.length; w++) {
+      const wr = this.wallRipples[w];
+      const norm = wr.life / wr.maxLife;
+      const span = (1.0 - norm * 0.4) * 34;
+      this.gridGfx.lineStyle(3, wr.color, norm * 0.85);
+      if (wr.side === 'left' || wr.side === 'right') {
+        const wx = wr.side === 'left' ? 1 : AW - 1;
+        this.gridGfx.moveTo(wx, Math.max(0, wr.y - span)).lineTo(wx, Math.min(AH, wr.y + span));
+      } else {
+        const wy = wr.side === 'top' ? 1 : AH - 1;
+        this.gridGfx.moveTo(Math.max(0, wr.x - span), wy).lineTo(Math.min(AW, wr.x + span), wy);
+      }
+    }
+  }
+
   updateVisuals(tS) {
+    // 0. Update Reactive Grid & Wall Ripples
+    this._renderReactiveGrid(tS);
+
     // 1. Interpolate Players
     for (let i = 0; i < this.players.length; i++) {
       this._updateActorSprite(this.players[i], tS);
@@ -977,7 +1305,7 @@ export class Arena extends PIXI.Container {
     if (this.unitOverlayGfx) {
       this.unitOverlayGfx.clear();
 
-      // Draw Fighter Shields & Stun Indicators
+      // Draw Fighter Shields & Invulnerability Halos
       for (let i = 0; i < this.players.length; i++) {
         const p = this.players[i];
         if (p.hp <= 0) continue;
@@ -985,16 +1313,24 @@ export class Arena extends PIXI.Container {
         const pY = p.spr.y;
 
         if (p.shield > 0) {
-          const shieldAlpha = 0.35 + 0.15 * Math.sin(this.totalTicks * 0.15);
+          const shieldAlpha = 0.38 + 0.16 * Math.sin(this.totalTicks * 0.15);
+          const rad = 13 * (p.baseScale || 1);
           this.unitOverlayGfx
-            .lineStyle(1.5, 0x00e5ff, shieldAlpha + 0.25)
-            .beginFill(0x00e5ff, shieldAlpha * 0.3)
-            .drawCircle(pX, pY, 13 * (p.baseScale || 1))
+            .lineStyle(1.8, 0x00e5ff, shieldAlpha + 0.28)
+            .beginFill(0x00e5ff, shieldAlpha * 0.25)
+            .drawCircle(pX, pY, rad)
             .endFill();
+
+          // Rotating inner energy arcs
+          const arcAng = this.totalTicks * 0.08;
+          this.unitOverlayGfx
+            .lineStyle(1.2, 0xffffff, shieldAlpha + 0.2)
+            .arc(pX, pY, rad - 1.5, arcAng, arcAng + 1.4)
+            .arc(pX, pY, rad - 1.5, arcAng + Math.PI, arcAng + Math.PI + 1.4);
         }
         if (p.invulnTicks > 0) {
           this.unitOverlayGfx
-            .lineStyle(1.5, 0xffdd00, 0.85)
+            .lineStyle(1.8, 0xffdd00, 0.88)
             .drawCircle(pX, pY, 15 * (p.baseScale || 1));
         }
       }
@@ -1027,14 +1363,17 @@ export class Arena extends PIXI.Container {
         const hpRatio = Math.max(0.2, Math.min(1, bCfg.hp / (bCfg.maxHp || 1)));
         const col = e.p.color || 0x00e5ff;
         this.unitOverlayGfx
-          .lineStyle(2, col, 0.75 * hpRatio)
-          .beginFill(col, 0.14 * hpRatio)
+          .lineStyle(2.2, col, 0.8 * hpRatio)
+          .beginFill(col, 0.16 * hpRatio)
           .drawCircle(bX, bY, radPx)
           .endFill();
+        this.unitOverlayGfx
+          .lineStyle(1, 0xffffff, 0.55 * hpRatio)
+          .drawCircle(bX, bY, Math.max(2, radPx - 2));
       }
     }
 
-    this.fxPool.update(tS);
+    this.fxPool.update(tS, this.currentFps || 60);
     if (this.beamRenderer) {
       this.beamRenderer.update(tS);
     }
@@ -1047,12 +1386,16 @@ export class Arena extends PIXI.Container {
     }
 
     if (this.shake > 0) {
-      const sx = Math.round(FastMath.randRange(-this.shake / 2, this.shake / 2));
-      const sy = Math.round(FastMath.randRange(-this.shake / 2, this.shake / 2));
-      this.view.position.set(sx, sy);
+      const jitterX = FastMath.randRange(-this.shake * 0.5, this.shake * 0.5);
+      const jitterY = FastMath.randRange(-this.shake * 0.5, this.shake * 0.5);
+      const dirBiasX = (this.shakeDirX || 0) * this.shake * 0.35;
+      const dirBiasY = (this.shakeDirY || 0) * this.shake * 0.35;
+      this.view.position.set(Math.round(jitterX + dirBiasX), Math.round(jitterY + dirBiasY));
       this.shake *= Math.pow(0.8, tS);
       if (this.shake < 0.5) {
         this.shake = 0;
+        this.shakeDirX = 0;
+        this.shakeDirY = 0;
         this.view.position.set(0, 0);
       }
     } else {
@@ -1064,6 +1407,7 @@ export class Arena extends PIXI.Container {
     if (!p.spr) return;
     if (p.hp <= 0) {
       p.spr.visible = false;
+      if (p.glowSpr) p.glowSpr.visible = false;
       return;
     }
     const pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
@@ -1084,6 +1428,17 @@ export class Arena extends PIXI.Container {
     p.aS.y += (p.aS.tY - p.aS.y) * CFG.RENDER.SPRING_DAMP * tS;
     p.spr.scale.set(p.aS.x, p.aS.y);
 
+    // Sync soft additive unit under-glow
+    if (p.glowSpr) {
+      p.glowSpr.visible = true;
+      p.glowSpr.x = p.spr.x;
+      p.glowSpr.y = p.spr.y;
+      p.glowSpr.tint = p.def.color || 0x00e5ff;
+      const pulse = 0.68 + 0.1 * Math.sin(this.totalTicks * 0.12);
+      p.glowSpr.scale.set(bS * pulse);
+      p.glowSpr.alpha = p.fT > 0 ? 0.75 : 0.38;
+    }
+
     if (p.fT > 0) {
       p.fT -= tS;
       p.spr.tint = CFG.JUICE.HIT_FLASH_COLOR;
@@ -1094,9 +1449,21 @@ export class Arena extends PIXI.Container {
 
   destroy(options) {
     if (this.beamRenderer) {
-      this.beamRenderer.clear();
+      try {
+        this.beamRenderer.clear();
+      } catch (e) {}
     }
-    super.destroy(options);
+    if (this.summons) {
+      this.summons.forEach((s) => {
+        try {
+          if (s.spr && !s.spr.destroyed) s.spr.destroy();
+        } catch (e) {}
+      });
+      this.summons = [];
+    }
+    try {
+      super.destroy(options);
+    } catch (e) {}
   }
 }
 

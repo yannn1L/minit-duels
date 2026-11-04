@@ -78,6 +78,48 @@ export class SimulationScene extends PIXI.Container {
       this.playerCards.push(cardContainer);
       this.addChild(cardContainer);
     });
+
+    // Compact Top-Right VFX Quality Toggle Button (AUTO / HIGH / LOW)
+    this.vfxBtn = new PIXI.Container();
+    this.vfxBtn.eventMode = 'static';
+    this.vfxBtn.cursor = 'pointer';
+    this.vfxBtnBg = new PIXI.Graphics();
+    this.vfxBtnTxt = new PIXI.Text('', {
+      ...UI_STYLE.STATS_LARGE,
+      fontSize: 7,
+      fill: 0x00e5ff
+    });
+    this.vfxBtnTxt.resolution = 2;
+    this.vfxBtnTxt.anchor.set(0.5);
+    this.vfxBtn.addChild(this.vfxBtnBg, this.vfxBtnTxt);
+    this.vfxBtn.on('pointerdown', (e) => {
+      e.stopPropagation();
+      AudioSys.play('click');
+      DebugConfig.cycleVfxQuality();
+      this._refreshVfxBtn(isLandscape);
+    });
+    this.addChild(this.vfxBtn);
+    this._refreshVfxBtn(isLandscape);
+  }
+
+  _refreshVfxBtn(isLandscape) {
+    if (!this.vfxBtn) return;
+    const mode = (DebugConfig.state.vfxQuality || 'auto').toUpperCase();
+    this.vfxBtnTxt.text = `VFX: ${mode}`;
+    const w = 78;
+    const h = 22;
+    const screenW = isLandscape ? CFG.APP.LANDSCAPE.W : CFG.APP.PORTRAIT.W;
+    this.vfxBtn.position.set(screenW - w - 14, 14);
+    this.vfxBtnTxt.position.set(w / 2, h / 2);
+
+    const col = mode === 'HIGH' ? 0x00ff66 : mode === 'LOW' ? 0xffdd00 : 0x00e5ff;
+    this.vfxBtnTxt.style.fill = col;
+    this.vfxBtnBg
+      .clear()
+      .beginFill(PALETTE.CARD_BG, 0.92)
+      .lineStyle(1.5, col, 0.85)
+      .drawRoundedRect(0, 0, w, h, 3)
+      .endFill();
   }
 
   _setupCardContent(c, md, cardCfg, isLandscape, idx) {
@@ -127,8 +169,9 @@ export class SimulationScene extends PIXI.Container {
     }
     hbB.endFill();
 
+    const hbTrail = new PIXI.Graphics();
     const hbF = new PIXI.Graphics();
-    hpC.addChild(hbB, hbF);
+    hpC.addChild(hbB, hbTrail, hbF);
     c.addChild(hpC);
 
     const ds = new PIXI.Text(md.desc, {
@@ -151,7 +194,18 @@ export class SimulationScene extends PIXI.Container {
       stC.addChild(sic);
     }
 
-    this.uC[idx] = { fg: hbF, max: md.stats.hp, stC: stC, hpCfg: cardCfg.hp };
+    const prevTrail = this.uC[idx]?.trailPct ?? 1.0;
+    this.uC[idx] = {
+      card: c,
+      baseX: Math.round(cardCfg.x),
+      baseY: Math.round(cardCfg.y),
+      fg: hbF,
+      trailGfx: hbTrail,
+      trailPct: prevTrail,
+      max: md.stats.hp,
+      stC: stC,
+      hpCfg: cardCfg.hp
+    };
   }
 
   applyLayout(isLandscape) {
@@ -175,6 +229,7 @@ export class SimulationScene extends PIXI.Container {
         this._setupCardContent(c, md, cardCfg, isLandscape, idx);
       }
     });
+    this._refreshVfxBtn(isLandscape);
   }
 
   loop(dl) {
@@ -204,7 +259,7 @@ export class SimulationScene extends PIXI.Container {
     }
 
     if (cS > 0) {
-      this.arena.update(cS);
+      this.arena.update(cS, this.app.ticker.FPS);
     }
 
     if (this.debugOverlay && !this.f) {
@@ -225,11 +280,39 @@ export class SimulationScene extends PIXI.Container {
       if (!ui) return;
       const pct = Math.max(0, p.hp / p.maxHp);
 
+      // Smoothly decay white damage-trail bar toward current HP pct
+      if (ui.trailPct > pct) {
+        ui.trailPct = Math.max(pct, ui.trailPct - 0.008 * cDl);
+      } else {
+        ui.trailPct = pct;
+      }
+
+      // Apply reactive HUD card jolt when fighter takes heavy hits
+      if (p.hudJolt && p.hudJolt > 0.2) {
+        const jx = (Math.random() - 0.5) * p.hudJolt;
+        const jy = (Math.random() - 0.5) * p.hudJolt;
+        ui.card.position.set(Math.round(ui.baseX + jx), Math.round(ui.baseY + jy));
+        p.hudJolt *= Math.pow(0.78, cDl);
+      } else if (ui.card) {
+        p.hudJolt = 0;
+        ui.card.position.set(ui.baseX, ui.baseY);
+      }
+
+      const hpCfg = ui.hpCfg;
+      ui.trailGfx.clear();
+      if (ui.trailPct > pct) {
+        ui.trailGfx.beginFill(0xffffff, 0.85);
+        const trailSegs = Math.ceil(ui.trailPct * hpCfg.segments);
+        for (let s = 0; s < trailSegs; s++) {
+          ui.trailGfx.drawRect(s * (hpCfg.segW + hpCfg.gap), 0, hpCfg.segW, hpCfg.h);
+        }
+        ui.trailGfx.endFill();
+      }
+
       ui.fg.clear();
       if (pct > 0) {
         const fC = pct > 0.6 ? PALETTE.HP.HIGH : pct > 0.3 ? PALETTE.HP.MID : PALETTE.HP.LOW;
         ui.fg.beginFill(fC);
-        const hpCfg = ui.hpCfg;
         const aS = Math.ceil(pct * hpCfg.segments);
         for (let s = 0; s < aS; s++) {
           ui.fg.drawRect(s * (hpCfg.segW + hpCfg.gap), 0, hpCfg.segW, hpCfg.h);
@@ -333,6 +416,8 @@ export class SimulationScene extends PIXI.Container {
 
   destroy(options) {
     this.cleanup();
-    super.destroy(options);
+    try {
+      super.destroy(options);
+    } catch (e) {}
   }
 }
