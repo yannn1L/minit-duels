@@ -96,8 +96,9 @@ export class VFXPool {
    */
   getBudgetMult() {
     const mode = DebugConfig.state.vfxQuality || 'auto';
-    if (mode === 'high') return 1.0;
-    if (mode === 'low') return 0.38;
+    const userMult = DebugConfig.state.vfxParticleMult ?? 1.0;
+    if (mode === 'high') return 1.0 * userMult;
+    if (mode === 'low') return 0.38 * userMult;
 
     // Auto-adaptive budget based on rolling FPS and active pool pressure
     const poolLoad = this.act.phys.length / (CFG.VFX.PHYSICS_LIMIT || 600);
@@ -108,7 +109,7 @@ export class VFXPool {
     if (poolLoad > 0.72) {
       mult *= 0.65;
     }
-    return mult;
+    return mult * userMult;
   }
 
   /**
@@ -267,6 +268,7 @@ export class VFXPool {
     life = 12,
     additive = true
   ) {
+    if (DebugConfig.state.vfxShowAfterimages === false) return null;
     if (this.pool.decals.length === 0) return null;
     if ((DebugConfig.state.vfxQuality || 'auto') === 'low' && FastMath.rand() > 0.5) return null;
 
@@ -298,6 +300,7 @@ export class VFXPool {
    * Stamps a persistent, slowly fading floor scorch mark under units on explosions or KOs.
    */
   spawnScorch(x, y, color = 0x00e5ff, scale = 1.1, life = 220) {
+    if (DebugConfig.state.vfxShowScorch === false) return null;
     if (this.pool.decals.length === 0) return null;
     const tex = this.textures['fx_scorch'];
     if (!tex) return null;
@@ -358,6 +361,7 @@ export class VFXPool {
    * Spawns floating damage, critical hit ('!'), or heal ('+') popup numbers with bounce physics.
    */
   spawnDmgText(x, y, dmg, color = 0xff0000, scale = 1.0, options = null) {
+    if (DebugConfig.state.vfxShowDmgText === false) return;
     if (this.pool.txts.length === 0) return;
     const val = Math.max(1, Math.floor(dmg));
     const str = val.toString();
@@ -370,7 +374,8 @@ export class VFXPool {
 
     const t = this.pool.txts.pop();
     const critScaleBoost = isCrit ? 1.24 : 1.0;
-    t.customScale = scale * critScaleBoost;
+    const userTxtScale = DebugConfig.state.vfxDmgTextScale ?? 1.0;
+    t.customScale = scale * critScaleBoost * userTxtScale;
     t.isCrit = isCrit;
 
     // Glyph 0: Sign ('+' for heal, '-' for damage)

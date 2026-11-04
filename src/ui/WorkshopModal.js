@@ -1,6 +1,6 @@
 // ============================================================
 // COMPACT DEV & WORKSHOP MODAL OVERLAY (ES Module)
-// Streamlined 3-Tab Popup: Minits, Balance Check & Debug Mode
+// Streamlined 4-Tab Popup: Minits, Balance Check, Setting & Debug
 // ============================================================
 import { AudioSys } from '../engine/AudioSys.js';
 import { MinitEngine } from '../engine/Registry.js';
@@ -9,14 +9,20 @@ import { HeadlessSimulator } from '../engine/HeadlessSimulator.js';
 import { DebugConfig } from '../engine/DebugConfig.js';
 
 function numToHexColor(num = 0x00e5ff) {
-  return '#' + Number(num).toString(16).padStart(6, '0');
+  return '#' + (Number(num) >>> 0).toString(16).padStart(6, '0').slice(-6);
+}
+
+function hexColorToNum(hexStr = '#12121e') {
+  const clean = String(hexStr).replace(/[^0-9a-fA-F]/g, '');
+  const parsed = parseInt(clean, 16);
+  return Number.isNaN(parsed) ? 0x12121e : parsed;
 }
 
 export class WorkshopModal {
   constructor({ app, onMinitsChanged }) {
     this.app = app;
     this.onMinitsChanged = onMinitsChanged;
-    this.activeTab = 'minits'; // 'minits' | 'balance' | 'debug'
+    this.activeTab = 'minits'; // 'minits' | 'balance' | 'settings' | 'debug'
     this.isRunningBalance = false;
     this.lastBalanceReport = null;
     this.roundsPerPair = 20;
@@ -341,6 +347,71 @@ export class WorkshopModal {
         background: #00e5ff;
         width: 0%;
       }
+      .mw-slider-row {
+        display: grid;
+        grid-template-columns: 145px 1fr 54px;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+        border-bottom: 1px solid #18182a;
+        font-size: 11px;
+      }
+      .mw-slider-row:last-child {
+        border-bottom: none;
+      }
+      .mw-range {
+        width: 100%;
+        accent-color: #00e5ff;
+        cursor: pointer;
+        height: 5px;
+      }
+      .mw-val-badge {
+        text-align: right;
+        font-family: monospace;
+        font-size: 11px;
+        color: #00e5ff;
+        font-variant-numeric: tabular-nums;
+      }
+      .mw-color-input {
+        width: 40px;
+        height: 24px;
+        border: 1px solid #383854;
+        background: #0c0c16;
+        padding: 1px;
+        cursor: pointer;
+      }
+      .mw-seg-group {
+        display: flex;
+        gap: 4px;
+      }
+      .mw-seg-btn {
+        font-family: 'Press Start 2P', monospace;
+        font-size: 7px;
+        padding: 6px 9px;
+        background: #141424;
+        color: #94a3b8;
+        border: 1px solid #2b2b44;
+        cursor: pointer;
+      }
+      .mw-seg-btn.active {
+        background: #003847;
+        color: #00e5ff;
+        border-color: #00e5ff;
+      }
+      .mw-subgrid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 14px;
+        margin-top: 6px;
+      }
+      @media (max-width: 500px) {
+        .mw-slider-row {
+          grid-template-columns: 115px 1fr 48px;
+        }
+        .mw-subgrid-2 {
+          grid-template-columns: 1fr;
+        }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -510,6 +581,9 @@ export class WorkshopModal {
         <button class="mw-tab-btn ${this.activeTab === 'balance' ? 'active' : ''}" data-tab="balance">
           BALANCE
         </button>
+        <button class="mw-tab-btn ${this.activeTab === 'settings' ? 'active' : ''}" data-tab="settings">
+          SETTING
+        </button>
         <button class="mw-tab-btn ${this.activeTab === 'debug' ? 'active' : ''}" data-tab="debug">
           DEBUG ${dbg.enabled ? '[ON]' : '[OFF]'}
         </button>
@@ -518,6 +592,7 @@ export class WorkshopModal {
       <div class="mw-body">
         ${this.activeTab === 'minits' ? this._renderMinitsTab(customRecords) : ''}
         ${this.activeTab === 'balance' ? this._renderBalanceTab() : ''}
+        ${this.activeTab === 'settings' ? this._renderSettingsTab(dbg) : ''}
         ${this.activeTab === 'debug' ? this._renderDebugTab(dbg) : ''}
       </div>
     `;
@@ -744,6 +819,177 @@ export class WorkshopModal {
     `;
   }
 
+  _renderSettingsTab(dbg) {
+    const vfxMode = dbg.vfxQuality || 'auto';
+    return `
+      <div class="mw-row-between" style="padding: 2px 2px 0 2px;">
+        <span class="mw-hint" style="margin:0;">All tweaks apply smoothly in real time and auto-save.</span>
+        <button class="mw-btn danger" id="mw-reset-settings-btn">RESET DEFAULTS</button>
+      </div>
+
+      <!-- SFX & AUDIO SYNTHESIS -->
+      <div class="mw-box">
+        <div class="mw-row-between" style="margin-bottom:6px;">
+          <span class="mw-label" style="color:#00e5ff;">SFX & AUDIO SYNTHESIS</span>
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+            <button class="mw-btn secondary" style="padding:4px 6px;font-size:7px;" data-sfx-test="hit">Hit</button>
+            <button class="mw-btn secondary" style="padding:4px 6px;font-size:7px;" data-sfx-test="laser">Laser</button>
+            <button class="mw-btn secondary" style="padding:4px 6px;font-size:7px;" data-sfx-test="explosion">Boom</button>
+            <button class="mw-btn secondary" style="padding:4px 6px;font-size:7px;" data-sfx-test="win">Win</button>
+          </div>
+        </div>
+
+        <div class="mw-toggle-row" style="padding:4px 0 8px 0;">
+          <span>Mute All Sound Effects</span>
+          <input type="checkbox" class="mw-checkbox" data-chk-key="sfxMuted" ${dbg.sfxMuted ? 'checked' : ''} />
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Master Volume</span>
+          <input type="range" class="mw-range" min="0" max="1.5" step="0.05" value="${dbg.sfxMasterVolume ?? 0.7}" data-range-key="sfxMasterVolume" data-unit="pct" />
+          <span class="mw-val-badge" id="val-sfxMasterVolume">${Math.round((dbg.sfxMasterVolume ?? 0.7) * 100)}%</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Synth Pitch Scale</span>
+          <input type="range" class="mw-range" min="0.5" max="1.6" step="0.05" value="${dbg.sfxPitchScale ?? 1.0}" data-range-key="sfxPitchScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-sfxPitchScale">${Number(dbg.sfxPitchScale ?? 1.0).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>SFX Cooldown Window</span>
+          <input type="range" class="mw-range" min="0.25" max="2.5" step="0.05" value="${dbg.sfxThrottleScale ?? 1.0}" data-range-key="sfxThrottleScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-sfxThrottleScale">${Number(dbg.sfxThrottleScale ?? 1.0).toFixed(2)}x</span>
+        </div>
+      </div>
+
+      <!-- VFX & COMBAT JUICE -->
+      <div class="mw-box">
+        <div class="mw-row-between" style="margin-bottom:8px;">
+          <span class="mw-label" style="color:#00ff66;">VFX & COMBAT JUICE</span>
+          <div class="mw-seg-group">
+            <button class="mw-seg-btn ${vfxMode === 'auto' ? 'active' : ''}" data-vfx-mode="auto">AUTO</button>
+            <button class="mw-seg-btn ${vfxMode === 'high' ? 'active' : ''}" data-vfx-mode="high">HIGH</button>
+            <button class="mw-seg-btn ${vfxMode === 'low' ? 'active' : ''}" data-vfx-mode="low">LOW</button>
+          </div>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Particle Density</span>
+          <input type="range" class="mw-range" min="0.2" max="2.5" step="0.05" value="${dbg.vfxParticleMult ?? 1.0}" data-range-key="vfxParticleMult" data-unit="mult" />
+          <span class="mw-val-badge" id="val-vfxParticleMult">${Number(dbg.vfxParticleMult ?? 1.0).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Camera Shake Intensity</span>
+          <input type="range" class="mw-range" min="0" max="2.5" step="0.05" value="${dbg.vfxShakeScale ?? 1.0}" data-range-key="vfxShakeScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-vfxShakeScale">${Number(dbg.vfxShakeScale ?? 1.0).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Hit-Stop Freeze</span>
+          <input type="range" class="mw-range" min="0" max="2.5" step="0.05" value="${dbg.vfxHitStopScale ?? 1.0}" data-range-key="vfxHitStopScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-vfxHitStopScale">${Number(dbg.vfxHitStopScale ?? 1.0).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Screen Flash Intensity</span>
+          <input type="range" class="mw-range" min="0" max="2.0" step="0.05" value="${dbg.vfxFlashScale ?? 1.0}" data-range-key="vfxFlashScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-vfxFlashScale">${Number(dbg.vfxFlashScale ?? 1.0).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Damage Popup Size</span>
+          <input type="range" class="mw-range" min="0.5" max="2.0" step="0.05" value="${dbg.vfxDmgTextScale ?? 1.0}" data-range-key="vfxDmgTextScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-vfxDmgTextScale">${Number(dbg.vfxDmgTextScale ?? 1.0).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Crit Hit Threshold</span>
+          <input type="range" class="mw-range" min="8" max="80" step="2" value="${dbg.vfxCritThreshold ?? 24}" data-range-key="vfxCritThreshold" data-unit="int" />
+          <span class="mw-val-badge" id="val-vfxCritThreshold">${Math.round(dbg.vfxCritThreshold ?? 24)}</span>
+        </div>
+
+        <div class="mw-subgrid-2">
+          <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
+            <span>Grid & Wall Ripples</span>
+            <input type="checkbox" class="mw-checkbox" data-chk-key="vfxShowGridRipples" ${dbg.vfxShowGridRipples !== false ? 'checked' : ''} />
+          </label>
+          <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
+            <span>Floor Scorch Marks</span>
+            <input type="checkbox" class="mw-checkbox" data-chk-key="vfxShowScorch" ${dbg.vfxShowScorch !== false ? 'checked' : ''} />
+          </label>
+          <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
+            <span>Motion Afterimages</span>
+            <input type="checkbox" class="mw-checkbox" data-chk-key="vfxShowAfterimages" ${dbg.vfxShowAfterimages !== false ? 'checked' : ''} />
+          </label>
+          <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
+            <span>Damage Popups</span>
+            <input type="checkbox" class="mw-checkbox" data-chk-key="vfxShowDmgText" ${dbg.vfxShowDmgText !== false ? 'checked' : ''} />
+          </label>
+        </div>
+      </div>
+
+      <!-- ARENA LAYOUT & COLORS -->
+      <div class="mw-box">
+        <div class="mw-row-between" style="margin-bottom:6px;">
+          <span class="mw-label" style="color:#ffdd00;">ARENA LAYOUT & COLORS</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Arena Columns (W)</span>
+          <input type="range" class="mw-range" min="6" max="18" step="1" value="${dbg.arenaCols ?? 10}" data-range-key="arenaCols" data-unit="int" />
+          <span class="mw-val-badge" id="val-arenaCols">${Math.round(dbg.arenaCols ?? 10)}</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Arena Rows (H)</span>
+          <input type="range" class="mw-range" min="6" max="18" step="1" value="${dbg.arenaRows ?? 10}" data-range-key="arenaRows" data-unit="int" />
+          <span class="mw-val-badge" id="val-arenaRows">${Math.round(dbg.arenaRows ?? 10)}</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Landscape Zoom</span>
+          <input type="range" class="mw-range" min="1.2" max="4.0" step="0.05" value="${dbg.arenaLandscapeScale ?? 2.7}" data-range-key="arenaLandscapeScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-arenaLandscapeScale">${Number(dbg.arenaLandscapeScale ?? 2.7).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Portrait Zoom</span>
+          <input type="range" class="mw-range" min="1.2" max="4.0" step="0.05" value="${dbg.arenaPortraitScale ?? 2.7}" data-range-key="arenaPortraitScale" data-unit="mult" />
+          <span class="mw-val-badge" id="val-arenaPortraitScale">${Number(dbg.arenaPortraitScale ?? 2.7).toFixed(2)}x</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Wall Bounce Padding</span>
+          <input type="range" class="mw-range" min="0.05" max="1.2" step="0.05" value="${dbg.arenaWallPadding ?? 0.2}" data-range-key="arenaWallPadding" data-unit="raw" />
+          <span class="mw-val-badge" id="val-arenaWallPadding">${Number(dbg.arenaWallPadding ?? 0.2).toFixed(2)}</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Grid Line Opacity</span>
+          <input type="range" class="mw-range" min="0" max="1.0" step="0.05" value="${dbg.arenaGridAlpha ?? 0.8}" data-range-key="arenaGridAlpha" data-unit="pct" />
+          <span class="mw-val-badge" id="val-arenaGridAlpha">${Math.round((dbg.arenaGridAlpha ?? 0.8) * 100)}%</span>
+        </div>
+
+        <div class="mw-row-between" style="margin-top:8px;padding-top:6px;border-top:1px solid #18182a;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;">
+            <span>Floor</span>
+            <input type="color" class="mw-color-input" data-color-key="arenaBgColor" value="${numToHexColor(dbg.arenaBgColor ?? 0x12121e)}" />
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;">
+            <span>Grid</span>
+            <input type="color" class="mw-color-input" data-color-key="arenaGridColor" value="${numToHexColor(dbg.arenaGridColor ?? 0x1c1c2e)}" />
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;">
+            <span>Border Guard</span>
+            <input type="color" class="mw-color-input" data-color-key="arenaGuardColor" value="${numToHexColor(dbg.arenaGuardColor ?? 0x2a2a40)}" />
+          </label>
+        </div>
+      </div>
+    `;
+  }
+
   _renderDebugTab(dbg) {
     return `
       <div class="mw-box">
@@ -883,5 +1129,64 @@ export class WorkshopModal {
         DebugConfig.update({ timeScale: Number(e.target.value) || 1.0 });
       });
     }
+
+    // --- SETTING TAB LIVE CONTROLS ---
+    const resetSettingsBtn = this.windowEl.querySelector('#mw-reset-settings-btn');
+    if (resetSettingsBtn) {
+      resetSettingsBtn.addEventListener('click', () => {
+        DebugConfig.resetSettingsToDefault();
+        AudioSys.play('start');
+        this.render();
+      });
+    }
+
+    this.windowEl.querySelectorAll('[data-sfx-test]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sfxName = btn.getAttribute('data-sfx-test');
+        AudioSys.play(sfxName, 1.0);
+      });
+    });
+
+    this.windowEl.querySelectorAll('[data-vfx-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-vfx-mode');
+        AudioSys.play('click');
+        DebugConfig.update({ vfxQuality: mode });
+        this.render();
+      });
+    });
+
+    this.windowEl.querySelectorAll('[data-chk-key]').forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const key = chk.getAttribute('data-chk-key');
+        DebugConfig.update({ [key]: Boolean(e.target.checked) });
+        AudioSys.play('click');
+      });
+    });
+
+    this.windowEl.querySelectorAll('[data-range-key]').forEach((slider) => {
+      slider.addEventListener('input', (e) => {
+        const key = slider.getAttribute('data-range-key');
+        const unit = slider.getAttribute('data-unit');
+        const val = Number(e.target.value);
+        DebugConfig.update({ [key]: val });
+
+        const badge = this.windowEl.querySelector(`#val-${key}`);
+        if (badge) {
+          if (unit === 'pct') badge.textContent = `${Math.round(val * 100)}%`;
+          else if (unit === 'int') badge.textContent = `${Math.round(val)}`;
+          else if (unit === 'raw') badge.textContent = val.toFixed(2);
+          else badge.textContent = `${val.toFixed(2)}x`;
+        }
+      });
+    });
+
+    this.windowEl.querySelectorAll('[data-color-key]').forEach((picker) => {
+      picker.addEventListener('input', (e) => {
+        const key = picker.getAttribute('data-color-key');
+        const numColor = hexColorToNum(e.target.value);
+        DebugConfig.update({ [key]: numColor });
+      });
+    });
   }
 }

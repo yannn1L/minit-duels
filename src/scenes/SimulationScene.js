@@ -34,6 +34,24 @@ export class SimulationScene extends PIXI.Container {
     this.arena.fxPool.initTex();
     AudioSys.play('start');
 
+    this._unsubDebug = DebugConfig.subscribe(() => {
+      if (this.destroyed) return;
+      if (this.arena && typeof this.arena.rebuildBoardVisuals === 'function') {
+        this.arena.rebuildBoardVisuals();
+      }
+      if (this.aG) {
+        const L = this.currentOrientation
+          ? CFG.LAYOUT.DUEL.LANDSCAPE
+          : CFG.LAYOUT.DUEL.PORTRAIT;
+        this.aG.pivot.set(
+          (CFG.GRID.COLS * CFG.GRID.TS) / 2,
+          (CFG.GRID.ROWS * CFG.GRID.TS) / 2
+        );
+        this.aG.position.set(L.arena.x, L.arena.y);
+        this.aG.scale.set(L.arena.scale);
+      }
+    });
+
     this.loopBound = this.loop.bind(this);
     this.app.ticker.add(this.loopBound);
   }
@@ -78,48 +96,6 @@ export class SimulationScene extends PIXI.Container {
       this.playerCards.push(cardContainer);
       this.addChild(cardContainer);
     });
-
-    // Compact Top-Right VFX Quality Toggle Button (AUTO / HIGH / LOW)
-    this.vfxBtn = new PIXI.Container();
-    this.vfxBtn.eventMode = 'static';
-    this.vfxBtn.cursor = 'pointer';
-    this.vfxBtnBg = new PIXI.Graphics();
-    this.vfxBtnTxt = new PIXI.Text('', {
-      ...UI_STYLE.STATS_LARGE,
-      fontSize: 7,
-      fill: 0x00e5ff
-    });
-    this.vfxBtnTxt.resolution = 2;
-    this.vfxBtnTxt.anchor.set(0.5);
-    this.vfxBtn.addChild(this.vfxBtnBg, this.vfxBtnTxt);
-    this.vfxBtn.on('pointerdown', (e) => {
-      e.stopPropagation();
-      AudioSys.play('click');
-      DebugConfig.cycleVfxQuality();
-      this._refreshVfxBtn(isLandscape);
-    });
-    this.addChild(this.vfxBtn);
-    this._refreshVfxBtn(isLandscape);
-  }
-
-  _refreshVfxBtn(isLandscape) {
-    if (!this.vfxBtn) return;
-    const mode = (DebugConfig.state.vfxQuality || 'auto').toUpperCase();
-    this.vfxBtnTxt.text = `VFX: ${mode}`;
-    const w = 78;
-    const h = 22;
-    const screenW = isLandscape ? CFG.APP.LANDSCAPE.W : CFG.APP.PORTRAIT.W;
-    this.vfxBtn.position.set(screenW - w - 14, 14);
-    this.vfxBtnTxt.position.set(w / 2, h / 2);
-
-    const col = mode === 'HIGH' ? 0x00ff66 : mode === 'LOW' ? 0xffdd00 : 0x00e5ff;
-    this.vfxBtnTxt.style.fill = col;
-    this.vfxBtnBg
-      .clear()
-      .beginFill(PALETTE.CARD_BG, 0.92)
-      .lineStyle(1.5, col, 0.85)
-      .drawRoundedRect(0, 0, w, h, 3)
-      .endFill();
   }
 
   _setupCardContent(c, md, cardCfg, isLandscape, idx) {
@@ -216,6 +192,10 @@ export class SimulationScene extends PIXI.Container {
       this.titleText.position.set(L.title.x, L.title.y);
     }
     if (this.aG) {
+      this.aG.pivot.set(
+        (CFG.GRID.COLS * CFG.GRID.TS) / 2,
+        (CFG.GRID.ROWS * CFG.GRID.TS) / 2
+      );
       this.aG.position.set(L.arena.x, L.arena.y);
       this.aG.scale.set(L.arena.scale);
     }
@@ -229,7 +209,6 @@ export class SimulationScene extends PIXI.Container {
         this._setupCardContent(c, md, cardCfg, isLandscape, idx);
       }
     });
-    this._refreshVfxBtn(isLandscape);
   }
 
   loop(dl) {
@@ -408,6 +387,10 @@ export class SimulationScene extends PIXI.Container {
   }
 
   cleanup() {
+    if (this._unsubDebug) {
+      this._unsubDebug();
+      this._unsubDebug = null;
+    }
     if (this.loopBound) {
       this.app.ticker.remove(this.loopBound);
       this.loopBound = null;

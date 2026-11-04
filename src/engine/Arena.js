@@ -12,6 +12,7 @@ import { BeamRenderer } from './BeamRenderer.js';
 import { MinitEngine } from './Registry.js';
 import { normalizeActionSlot } from './MinitContract.js';
 import { MinitSDK, executeMovementAI, invokeMinitHook } from './MinitSDK.js';
+import { DebugConfig } from './DebugConfig.js';
 
 const NOOP_FN = () => {};
 const HEADLESS_FX_POOL = {
@@ -81,34 +82,17 @@ export class Arena extends PIXI.Container {
       this.addChild(this.view);
 
       // Background Arena Board with crisp borders
-      const bg = new PIXI.Graphics()
-        .beginFill(CFG.ARENA.BG_COLOR, CFG.ARENA.BG_ALPHA)
-        .lineStyle(2, CFG.ARENA.GUARD_COLOR, 1)
-        .drawRect(-2, -2, AW + 4, AH + 4)
-        .endFill();
-
-      // Arena Corner Guards
-      const gL = 16;
-      const gT = 4;
-      bg.beginFill(CFG.ARENA.GUARD_COLOR)
-        .drawRect(-gT, -gT, gL, gT)
-        .drawRect(-gT, -gT, gT, gL)
-        .drawRect(AW + gT - gL, -gT, gL, gT)
-        .drawRect(AW, -gT, gT, gL)
-        .drawRect(-gT, AH, gL, gT)
-        .drawRect(-gT, AH + gT - gL, gT, gL)
-        .drawRect(AW + gT - gL, AH, gL, gT)
-        .drawRect(AW, AH + gT - gL, gT, gL)
-        .endFill();
-
-      this.view.addChild(bg);
+      this.bgGfx = new PIXI.Graphics();
+      this.view.addChild(this.bgGfx);
 
       // Arena Interior Layer
-      const mask = new PIXI.Graphics().beginFill(0xffffff).drawRect(0, 0, AW, AH).endFill();
-      this.view.addChild(mask);
+      this.maskGfx = new PIXI.Graphics();
+      this.view.addChild(this.maskGfx);
       this.layer = new PIXI.Container();
-      this.layer.mask = mask;
+      this.layer.mask = this.maskGfx;
       this.view.addChild(this.layer);
+
+      this._drawBoardFrame(AW, AH);
 
       // Reactive Grid Floor & Wall Ripple Graphics
       this.gridGfx = new PIXI.Graphics();
@@ -259,6 +243,50 @@ export class Arena extends PIXI.Container {
     // Invoke `onInit` hook for each fighter once the arena is ready
     for (let i = 0; i < this.players.length; i++) {
       invokeMinitHook(this.players[i], 'onInit', this);
+    }
+  }
+
+  _drawBoardFrame(AW, AH) {
+    if (this.isHeadless || !this.bgGfx || !this.maskGfx) return;
+    this.bgGfx
+      .clear()
+      .beginFill(CFG.ARENA.BG_COLOR, CFG.ARENA.BG_ALPHA)
+      .lineStyle(2, CFG.ARENA.GUARD_COLOR, 1)
+      .drawRect(-2, -2, AW + 4, AH + 4)
+      .endFill();
+
+    const gL = 16;
+    const gT = 4;
+    this.bgGfx
+      .beginFill(CFG.ARENA.GUARD_COLOR)
+      .drawRect(-gT, -gT, gL, gT)
+      .drawRect(-gT, -gT, gT, gL)
+      .drawRect(AW + gT - gL, -gT, gL, gT)
+      .drawRect(AW, -gT, gT, gL)
+      .drawRect(-gT, AH, gL, gT)
+      .drawRect(-gT, AH + gT - gL, gT, gL)
+      .drawRect(AW + gT - gL, AH, gL, gT)
+      .drawRect(AW, AH + gT - gL, gT, gL)
+      .endFill();
+
+    this.maskGfx.clear().beginFill(0xffffff).drawRect(0, 0, AW, AH).endFill();
+
+    if (this.sF) {
+      this.sF.clear().beginFill(0xffffff).drawRect(0, 0, AW, AH).endFill();
+    }
+  }
+
+  rebuildBoardVisuals() {
+    if (this.isHeadless) return;
+    const AW = CFG.GRID.COLS * CFG.GRID.TS;
+    const AH = CFG.GRID.ROWS * CFG.GRID.TS;
+    this._drawBoardFrame(AW, AH);
+    this._gridDirty = true;
+    this._renderReactiveGrid(0);
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i];
+      p.x = FastMath.clamp(p.x, CFG.ARENA_BOUNDS.MIN_X, CFG.ARENA_BOUNDS.MAX_X);
+      p.y = FastMath.clamp(p.y, CFG.ARENA_BOUNDS.MIN_Y, CFG.ARENA_BOUNDS.MAX_Y);
     }
   }
 
@@ -514,7 +542,8 @@ export class Arena extends PIXI.Container {
 
   triggerFlash(a = 0.5) {
     if (!this.isHeadless) {
-      this.fA = Math.max(this.fA, a);
+      const flashMult = DebugConfig.state.vfxFlashScale ?? 1.0;
+      this.fA = Math.max(this.fA, a * flashMult);
     }
   }
 
@@ -545,7 +574,8 @@ export class Arena extends PIXI.Container {
       p.aS.tX = bS * 0.7;
       p.aS.tY = bS * 1.35;
     }
-    if (shake && !this.isHeadless) this.shake = Math.max(this.shake, shake);
+    const shakeMult = DebugConfig.state.vfxShakeScale ?? 1.0;
+    if (shake && !this.isHeadless) this.shake = Math.max(this.shake, shake * shakeMult);
     if (playSound && !this.isHeadless) AudioSys.play('hit', 0.8);
   }
 
@@ -676,7 +706,8 @@ export class Arena extends PIXI.Container {
 
     if (!this.isHeadless) {
       if (p.fT <= 0) p.fT = vfx.unitFlashDur ?? CFG.JUICE.HIT_FLASH_DUR;
-      const targetShake = vfx.shake ?? (isCrit ? 6 : 2.5);
+      const shakeMult = DebugConfig.state.vfxShakeScale ?? 1.0;
+      const targetShake = (vfx.shake ?? (isCrit ? 6 : 2.5)) * shakeMult;
       if (targetShake > 0) {
         this.shake = Math.max(this.shake, targetShake);
         this.shakeDirX = Math.cos(hitAngle);
@@ -685,7 +716,8 @@ export class Arena extends PIXI.Container {
       if (vfx.flash) this.triggerFlash(vfx.flash);
 
       // Dynamic hit-stop freeze on heavy hits
-      const dynamicHitStop = vfx.hitStop ?? (isCrit ? 3 : 0);
+      const hitStopMult = DebugConfig.state.vfxHitStopScale ?? 1.0;
+      const dynamicHitStop = (vfx.hitStop ?? (isCrit ? 3 : 0)) * hitStopMult;
       if (dynamicHitStop > 0) {
         this.hitStop = Math.max(this.hitStop, dynamicHitStop);
       }
@@ -758,9 +790,17 @@ export class Arena extends PIXI.Container {
         if (!p.isSummon) {
           this.triggerFlash(dVfx.flash || CFG.JUICE.DEATH_FLASH_INTENSITY);
         }
-        this.shake = Math.max(this.shake, p.isSummon ? 4 : dVfx.shake || CFG.JUICE.DEATH_SHAKE);
+        const shakeMult = DebugConfig.state.vfxShakeScale ?? 1.0;
+        const hitStopMult = DebugConfig.state.vfxHitStopScale ?? 1.0;
+        this.shake = Math.max(
+          this.shake,
+          (p.isSummon ? 4 : dVfx.shake || CFG.JUICE.DEATH_SHAKE) * shakeMult
+        );
         if (!p.isSummon) {
-          this.hitStop = Math.max(this.hitStop, dVfx.hitStop || CFG.JUICE.DEATH_HIT_STOP);
+          this.hitStop = Math.max(
+            this.hitStop,
+            (dVfx.hitStop || CFG.JUICE.DEATH_HIT_STOP) * hitStopMult
+          );
         }
 
         const koRad = p.isSummon ? 45 : dVfx.shockRad || CFG.VFX.DEATH.SHOCK_RAD;
@@ -792,7 +832,7 @@ export class Arena extends PIXI.Container {
    * Triggers a radial spring-displacement ripple across the arena floor grid.
    */
   spawnGridRipple(px, py, maxRadius = 75, strength = 5.5, color = 0x00e5ff) {
-    if (this.isHeadless) return;
+    if (this.isHeadless || DebugConfig.state.vfxShowGridRipples === false) return;
     if (!this.gridRipples) this.gridRipples = [];
     if (this.gridRipples.length >= 10) {
       this.gridRipples.shift();
@@ -814,7 +854,7 @@ export class Arena extends PIXI.Container {
    * Triggers a glowing impact wave along an arena border wall (`'left' | 'right' | 'top' | 'bottom'`).
    */
   spawnWallRipple(wallSide, px, py, color = 0x00e5ff) {
-    if (this.isHeadless) return;
+    if (this.isHeadless || DebugConfig.state.vfxShowGridRipples === false) return;
     if (!this.wallRipples) this.wallRipples = [];
     if (this.wallRipples.length >= 8) {
       this.wallRipples.shift();

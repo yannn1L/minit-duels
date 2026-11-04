@@ -3,6 +3,7 @@
 // ============================================================
 import { CFG } from '../config.js';
 import { MinitEngine } from './Registry.js';
+import { DebugConfig } from './DebugConfig.js';
 
 class AudioSystem {
   constructor() {
@@ -15,7 +16,7 @@ class AudioSystem {
   }
 
   ensureContext() {
-    if (this.muted) return;
+    if (this.muted || DebugConfig.state.sfxMuted) return;
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
@@ -27,7 +28,7 @@ class AudioSystem {
     }
     if (this.ctx && !this.masterGain) {
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = CFG.AUDIO.MASTER_GAIN;
+      this.masterGain.gain.value = DebugConfig.state.sfxMasterVolume ?? CFG.AUDIO.MASTER_GAIN;
       this.compressor = this.ctx.createDynamicsCompressor();
       this.compressor.threshold.value = CFG.AUDIO.COMPRESSOR.THRESHOLD;
       this.compressor.ratio.value = CFG.AUDIO.COMPRESSOR.RATIO;
@@ -43,6 +44,9 @@ class AudioSystem {
         data[i] = Math.random() * 2 - 1;
       }
     }
+    if (this.masterGain) {
+      this.masterGain.gain.value = DebugConfig.state.sfxMasterVolume ?? CFG.AUDIO.MASTER_GAIN;
+    }
   }
 
   init() {
@@ -50,13 +54,15 @@ class AudioSystem {
   }
 
   play(type, volumeMultiplier = 1) {
-    if (this.muted) return;
+    const st = DebugConfig.state;
+    if (this.muted || st.sfxMuted || (st.sfxMasterVolume ?? 0.7) <= 0.001) return;
     this.ensureContext();
     if (!this.ctx || this.ctx.state === 'suspended' || !this.masterGain) return;
 
     const now = this.ctx.currentTime;
     const def = MinitEngine.Registry.audio[type];
-    const throttle = def?.throttle ?? CFG.AUDIO.THROTTLE[type] ?? CFG.AUDIO.THROTTLE.DEFAULT;
+    const baseThrottle = def?.throttle ?? CFG.AUDIO.THROTTLE[type] ?? CFG.AUDIO.THROTTLE.DEFAULT;
+    const throttle = baseThrottle * (st.sfxThrottleScale ?? 1.0);
 
     if (this.lastPlay[type] && now - this.lastPlay[type] < throttle) return;
     this.lastPlay[type] = now;
@@ -65,15 +71,16 @@ class AudioSystem {
     const gain = this.ctx.createGain();
     gain.connect(this.masterGain);
     const targetVolume = (typeof def.v === 'function' ? def.v() : def.v) * volumeMultiplier;
+    const pitchScale = st.sfxPitchScale ?? 1.0;
 
     if (def.noise) {
-      this._playNoise(def, gain, targetVolume, now);
+      this._playNoise(def, gain, targetVolume, now, pitchScale);
     } else {
-      this._playOscillator(def, gain, targetVolume, now);
+      this._playOscillator(def, gain, targetVolume, now, pitchScale);
     }
   }
 
-  _playNoise(def, gain, volume, time) {
+  _playNoise(def, gain, volume, time, pitchScale = 1.0) {
     if (!this.cachedNoiseBuffer) return;
 
     const noiseSource = this.ctx.createBufferSource();
@@ -81,9 +88,11 @@ class AudioSystem {
 
     const filter = this.ctx.createBiquadFilter();
     filter.type = def.fType || 'lowpass';
-    const f0 = typeof def.f0 === 'function' ? def.f0() : def.f0;
-    filter.frequency.setValueAtTime(f0, time);
-    if (def.f1) filter.frequency.exponentialRampToValueAtTime(def.f1, time + def.d);
+    const f0 = (typeof def.f0 === 'function' ? def.f0() : def.f0) * pitchScale;
+    filter.frequency.setValueAtTime(Math.max(20, f0), time);
+    if (def.f1) {
+      filter.frequency.exponentialRampToValueAtTime(Math.max(20, def.f1 * pitchScale), time + def.d);
+    }
 
     noiseSource.connect(filter);
     filter.connect(gain);
@@ -94,8 +103,11 @@ class AudioSystem {
     if (def.oF0) {
       const osc = this.ctx.createOscillator();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(def.oF0, time);
-      osc.frequency.exponentialRampToValueAtTime(def.oF1, time + Math.min(0.4, def.d));
+      osc.frequency.setValueAtTime(Math.max(15, def.oF0 * pitchScale), time);
+      osc.frequency.exponentialRampToValueAtTime(
+        Math.max(10, (def.oF1 || 10) * pitchScale),
+        time + Math.min(0.4, def.d)
+      );
       osc.connect(gain);
       osc.start(time);
       osc.stop(time + Math.min(0.4, def.d));
@@ -112,27 +124,29 @@ class AudioSystem {
     };
   }
 
-  _playOscillator(def, gain, volume, time) {
+  _playOscillator(def, gain, volume, time, pitchScale = 1.0) {
     const osc = this.ctx.createOscillator();
     osc.connect(gain);
     osc.type = def.t || 'sine';
-    const startFreq = typeof def.f0 === 'function' ? def.f0() : def.f0;
+    const rawStart = typeof def.f0 === 'function' ? def.f0() : def.f0;
+    const startFreq = Math.max(20, rawStart * pitchScale);
     osc.frequency.setValueAtTime(startFreq, time);
 
     if (def.seq) {
       def.seq.forEach((freq, idx) => {
-        const f = typeof freq === 'function' ? freq() : freq;
-        osc.frequency.setValueAtTime(f, time + (idx + 1) * 0.05);
+        const f = (typeof freq === 'function' ? freq() : freq) * pitchScale;
+        osc.frequency.setValueAtTime(Math.max(20, f), time + (idx + 1) * 0.05);
       });
     } else if (def.ramp === 'lin_exp' && def.f1 && def.f2) {
-      const midFreq = typeof def.f1 === 'function' ? def.f1(startFreq) : def.f1;
-      osc.frequency.linearRampToValueAtTime(midFreq, time + 0.1);
-      osc.frequency.exponentialRampToValueAtTime(def.f2, time + def.d);
+      const midFreq = (typeof def.f1 === 'function' ? def.f1(rawStart) : def.f1) * pitchScale;
+      osc.frequency.linearRampToValueAtTime(Math.max(20, midFreq), time + 0.1);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, def.f2 * pitchScale), time + def.d);
     } else if (def.f1) {
+      const endFreq = Math.max(20, def.f1 * pitchScale);
       if (def.ramp === 'lin') {
-        osc.frequency.linearRampToValueAtTime(def.f1, time + def.d);
+        osc.frequency.linearRampToValueAtTime(endFreq, time + def.d);
       } else {
-        osc.frequency.exponentialRampToValueAtTime(def.f1, time + def.d);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, time + def.d);
       }
     }
 
