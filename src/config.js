@@ -87,11 +87,11 @@ export const CFG = {
         }
       },
       PORTRAIT: {
-        title: { x: 270, y: -15 },
-        arena: { x: 270, y: 265, scale: 2.7 },
+        title: { x: 270, y: -55 },
+        arena: { x: 270, y: 295, scale: 2.7 },
         p1_card: {
-          x: 140,
-          y: 585,
+          x: 150,
+          y: 615,
           width: 230,
           height: 140,
           icon: { x: 34, y: 34, scale: 2.4 },
@@ -101,8 +101,8 @@ export const CFG = {
           status: { x: 14, y: 108, size: 12, gap: 3 }
         },
         p2_card: {
-          x: 400,
-          y: 585,
+          x: 390,
+          y: 615,
           width: 230,
           height: 140,
           icon: { x: 34, y: 34, scale: 2.4 },

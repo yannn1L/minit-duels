@@ -1,91 +1,96 @@
-# Compact & Streamlined Editor Scene + Dev Mode UI
+# Universal Minit Builder & Flexible Combat Engine Architecture
 
-This update refines the **Editor Scene** and the **Dev Mode / Workshop Modal** into a clean, compact, and distraction-free retro pixel interface across both Landscape and Portrait orientations while maintaining reliable touch hit-testing for bottom cards.
+This upgrade transforms the Minit combat engine from a fixed single-cooldown loop into an open, extensible **Universal Fighter & Entity Sandbox**. Creators can still build Minits with simple declarative configs, or combine **Full Lifecycle Hooks**, **Multi-Ability Slots & Passives**, **Pluggable Movement AI**, **Destroyable Summons/Clones/Turrets**, and **Projectile-Blocking Shields**—making any fighter archetype possible.
 
 ---
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following design choices have been confirmed from your answers and will guide the implementation:
+> The following architectural decisions are confirmed from your answers and maintain **100% backward compatibility** with all existing built-in and custom Minits:
 
-- **Minimal Fighter Cards**: Each fighter card displays only the essentials—16×16 sprite icon, fighter name, segmented HP bar, and short description (plus a small `X` delete button on custom Minits)—removing extra stat text lines and heavy inner frames.
-- **Clean Bottom Selection Bar**: Displays the `SELECTED:` indicator with the two chosen fighter icons and reveals the **`START DUEL!`** button only when 2 fighters are selected.
-- **Single Unified `DEV` Button & Compact Modal**: Replaces multiple header buttons with a single compact **`DEV`** button in the top-right corner that opens a streamlined, compact popup modal for importing/managing Minits, running Headless Balance checks, and toggling Debug Mode.
+- **Full Fighter & Entity Lifecycle Hooks**: Unlock `onInit`, `onTick`, `onMove`, `onAction`, `onWallBounce`, `onBeforeDealDamage`, `onDealDamage`, `onBeforeDamaged`, `onDamaged`, `onBeforeDeath` (enabling revives, immortality windows, and boss phase transitions), and `onDeath`.
+- **Multi-Ability Slots, Passives & State Machines**: Support an `actions: [...]` array (multiple independent cooldowns, energy/combo conditions, and weights) alongside the classic single `action` object, plus `passive` traits, shields (`owner.shield`), stun/freeze (`owner.stunTicks`), invulnerability (`owner.invulnTicks`), and `owner.state`.
+- **Pluggable Movement AI**: Built-in movement controllers (`wander`, `chase`, `kite`, `orbit`, `strafe`, `stationary`, `teleport_step`, or a custom `onMove` callback) so fighters can act as snipers, assassins, orbiters, or brawlers.
+- **Destroyable Summons, Clones, Turrets & Projectile-Blocking Barriers**: Spawnable sub-units with their own HP, sprites, AI, and attacks, plus barrier/shield entities that intercept or reflect enemy projectiles.
+- **Keep File-Only Workshop & Expand Starter Template**: Keep the Dev modal compact and file-import focused while upgrading the downloadable `.js` starter template and `README.md` to showcase the full Minit SDK.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Strips away visual clutter from the character selection screen and developer suite so players can pick fighters immediately and access modding, balancing, and debugging tools from one compact window.
-- **Target Audience / Persona**: Players and Minit creators on both desktop (Landscape) and mobile (Portrait) viewports.
-- **Key Value**: Maximum clarity, larger uncluttered scroll space for fighter cards, and a fast, compact Dev popup that fits comfortably on any screen size.
+- **What It Does**: Removes all hardcoded assumptions about how a Minit moves, attacks, takes damage, or dies. Every aspect of a fighter's behavior can be configured declaratively or scripted via clean JavaScript hooks and `MinitSDK` helper methods.
+- **Target Audience / Persona**: Game developers and players creating custom Minits ranging from simple projectile fighters to complex multi-phase bosses, necromancer summoners, shield paladins, and teleporting assassins.
+- **Key Value**: Unlimited creative freedom with zero boilerplate math—works identically in live WebGL duels and high-speed Headless Balance simulations.
 
 ---
 
-## 2. User Experience & Visual Design
+## 2. User Experience & Creator Workflow
 
-- **Key User Flows**:
-  1. **Fighter Selection**: The player sees the `MINIT DUELS` header, a single top-right `DEV` button, and a clean grid of minimal fighter cards. Tapping any card (including bottom-row cards in Portrait mode) toggles selection with crisp neon corner brackets.
-  2. **Starting a Duel**: Selected fighter sprites appear in the compact bottom footer. As soon as 2 fighters are chosen, the `START DUEL!` button appears cleanly beside/below them.
-  3. **Unified Dev Modal**: Clicking `DEV` opens a compact retro modal (`max-width: 680px`) with 3 concise tabs: **`MINITS`**, **`BALANCE`**, and **`DEBUG`**.
-- **Visual Identity & Theme**:
-  - *Aesthetic Direction*: Crisp 8-bit arcade minimalism (`Press Start 2P` pixel typography with high-contrast dark slate surfaces).
-  - *Color Palette & Mood*: Deep obsidian canvas (`#07070c`), subtle card surfaces (`#0d0d16`), slate borders (`#242436`), and high-intent cyan (`#00e5ff`) and emerald (`#00ff66`) accents.
-  - *Component Styling & Layout*:
-    - Compact modal padding (`12px`), tight single-row controls, and a combined dropzone + file picker bar for importing `.js` and `.png` Minit files.
-    - Simplified Balance Check view showing a compact control bar, concise leaderboard table (`Minit`, `Win %`, `W-L`, `TTK`, `DPS`, `Status`), and a compact head-to-head winrate matrix.
-    - Streamlined Debug tab with compact single-line toggle rows and speed selector pills (`0.25x` to `4x`).
+- **Authoring Experience**:
+  1. **Declarative Simplicity**: A creator can define `movement: { type: 'kite', idealDist: 5 }`, `actions: [primaryShot, ultimateBeam]`, and `stats: { hp: 1100, shield: 200, speed: 0.15 }` without writing low-level physics code.
+  2. **Unlimited Scripting Power**: For bespoke mechanics (e.g., countering hits while a shield is up, splitting into 2 clones at 50% HP, or stealing enemy stats), creators define `hooks: { onBeforeDamaged(self, dmgInfo, arena) { ... }, onBeforeDeath(self, arena) { ... } }`.
+  3. **Ergonomic `MinitSDK` Helpers**: Creators can call intuitive methods on the `arena` (or injected `SDK` object) such as `a.shootProjectile(...)`, `a.spawnSummon(...)`, `a.spawnShieldBarrier(...)`, `a.teleport(...)`, `a.dash(...)`, `a.heal(...)`, `a.addShield(...)`, and `a.setPhase(...)` using grid coordinates directly without manual pixel conversion.
+- **Visual & Simulation Fidelity**:
+  - Summons, clones, and turrets render their own crisp pixel sprites, miniature health bars, and hit flashes inside the arena.
+  - Fighter shields and custom vector graphics (`self.gfx`) render cleanly around fighters in real-time combat and safely no-op in headless balance runs.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Stationary Scroll Viewport with Minimal Card Geometry**
-  - *Chosen Approach*: Keep the stationary outer scroll viewport (`hitArea` + `mask` fixed in stage space while inner card container scrolls) while restoring the clean `196×98` (Landscape) / `236×104` (Portrait) minimal card layout.
-  - *Why*: Guarantees bottom cards in Portrait mode can always be pressed and selected without visual overcrowding.
-- **Decision 2: Compact Single-Window Dev Popup**
-  - *Chosen Approach*: Consolidate all developer actions under one `DEV` button and remove verbose paragraphs, KPI summary boxes, and redundant built-in roster cards from the modal.
-  - *Why*: Eliminates vertical scrolling clutter inside the Dev window and makes importing Minits, checking balance, and toggling debug overlays fast on both desktop and mobile screens.
+- **Decision 1: Backward-Compatible Normalization in `MinitContract`**
+  - *Chosen Approach*: `validateAndSanitizeMinit` preserves `minit.action` for existing Minits while normalizing `minit.actions` (an array of ability slots), `minit.movement`, `minit.passive`, `minit.initialState`, and `minit.hooks`.
+  - *Why*: Every existing Minit (`laser`, `pulsar`, `absorb`, `waves`, `moth`, `murasaki`, `ironmen`, `saitama`, and saved custom Minits) continues to work without breaking changes.
+- **Decision 2: Unified Combat Actor Model for Fighters & Summons**
+  - *Chosen Approach*: Summons, clones, and turrets are managed in `arena.summons` (sharing targetable actor properties `x, y, dx, dy, hp, maxHp, ownerId, team, radius, spr`) and automatically participate in collision, targeting, and cleanup when defeated or when their summoner dies.
+  - *Why*: Allows universal traits (`damageRadiusOnHit`, `modularBeam`, `homingMissile`) and targeting rules (`closest_enemy`, `lowest_hp`, `summons_first`) to interact naturally with summons and clones.
+- **Decision 3: Interceptable Projectile & Barrier Tagging**
+  - *Chosen Approach*: Projectiles spawned via actions or `a.shootProjectile` can be intercepted or reflected by active barrier entities (`isBarrier: true`, `blocksProjectiles: true`, `reflectProjectiles: true`).
+  - *Why*: Enables wind-walls, orbital energy shields, and reflect-parry mechanics across any matchup.
 
 ---
 
 ## 4. Technical Architecture & Data Strategy
 
 ```text
-┌───────────────────────────────────────────────────────────────────┐
-│                         EDITOR SCENE UI                           │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │ Header: "MINIT DUELS" + Subtitle               [ DEV ] Btn  │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │ Stationary Scroll Viewport (Fixed Mask + Fixed HitArea)     │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │  │
-│  │  │ Minimal Card │  │ Minimal Card │  │ Minimal Card │ ...   │  │
-│  │  │ Icon+Name+HP │  │ Icon+Name+HP │  │ Icon+Name+HP │       │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘       │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────────────────┐  │
-│  │ Compact Footer: SELECTED: [Icon 1] [Icon 2]  [START DUEL!]  │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────┬─────────────────────────────────┘
-                                  │ Opens
-                                  ▼
-┌───────────────────────────────────────────────────────────────────┐
-│                  COMPACT DEV MODAL (680px Max)                    │
-│  Tabs: [ MINITS (Import/Saved) ]  [ BALANCE ]  [ DEBUG ]          │
-├───────────────────────────────────────────────────────────────────┤
-│  • MINITS : Compact Dropzone + Template Btn + Saved Custom List   │
-│  • BALANCE: Rounds/Timeout Bar + Run Btn + Compact Table & Matrix │
-│  • DEBUG  : Compact Toggle Switches + Speed Selector              │
-└───────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    UNIVERSAL MINIT DEFINITION (.JS)                     │
+│  • Identity & Stats : hp, speed, shield, armor, energy, maxEnergy       │
+│  • Movement AI      : 'wander' | 'chase' | 'kite' | 'orbit' | 'custom'  │
+│  • Ability Slots    : action (single) OR actions: [ slot1, slot2, ... ] │
+│  • Lifecycle Hooks  : onInit, onTick, onMove, onBeforeDamaged,          │
+│                       onDamaged, onDealDamage, onBeforeDeath, onDeath   │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ Validated & Registered
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     60HZ ARENA SIMULATION PIPELINE                      │
+│                                                                         │
+│  1. Fighter Tick & Statuses (stunTicks, invulnTicks, shield decay/regen)│
+│  2. Movement Controller (AI Steering / Kite / Orbit / Custom onMove)    │
+│  3. Multi-Slot Ability Scheduler (Cooldowns, Energy Costs, Conditions)  │
+│  4. Summon / Clone / Turret AI & Action Loop (arena.summons)            │
+│  5. Entity & Barrier ECS Loop (Projectiles vs. Barriers/Summons/Players)│
+│  6. Damage & Death Pipeline (onBeforeDamaged -> Shield/Armor ->         │
+│                              onDamaged -> onBeforeDeath -> Revive/KO)   │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ Powered by
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        MINIT SDK HELPER TOOLKIT                         │
+│  • Combat  : shootProjectile, fireBeam, dealAreaDamage, heal, addShield │
+│  • Units   : spawnSummon, spawnClone, spawnTurret, spawnBarrier         │
+│  • Motion  : teleport, dash, steerToward, orbitAround, applyKnockback   │
+│  • State   : setPhase, transform, applyStatus, spawnVfx, playSound      │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Interactive Component & State Mapping**:
-  - **Editor Header**: Single `DEV` button (`DEV [DBG]` in green when Debug Mode is active) opens the modal directly.
-  - **Minimal Fighter Cards**: Tapping toggles selection in `this.sel` (up to 2 fighters), updates neon corner brackets, and refreshes the footer preview icons and `START DUEL!` visibility.
-  - **Compact Dev Modal**:
-    - `MINITS` tab: Compact drag-and-drop / file picker bar auto-syncs `<name>.js` and `<name>.png` into `localStorage` and lists custom Minits with 1-click `Export` and `Delete` buttons.
-    - `BALANCE` tab: Inline toolbar triggers `HeadlessSimulator.runFullBalanceReport` and renders a tight leaderboard and matrix table.
-    - `DEBUG` tab: Compact toggle switches mutate `DebugConfig` state and immediately sync with the Editor and Simulation scenes.
+  - **Damage Interception & Revive Pipeline**: When `arena.damagePlayer(targetId, payload, color, attackerId)` is called:
+    1. Checks `target.invulnTicks > 0` (ignores damage if invulnerable).
+    2. Invokes `target.def.hooks.onBeforeDamaged(target, dmgContext, arena)`—allowing the hook to modify `dmgContext.dmg`, cancel the hit (`dmgContext.cancel = true`), or trigger a counter-attack.
+    3. Applies `target.def.stats.armor` (flat or % mitigation) and absorbs damage against `target.shield` before reducing `target.hp`.
+    4. Invokes `attacker.def.hooks.onDealDamage` and `target.def.hooks.onDamaged`.
+    5. If `target.hp <= 0`, invokes `target.def.hooks.onBeforeDeath(target, arena)`—if the hook heals `target.hp > 0` (e.g., Phoenix revive or Second Boss Phase), death is canceled and the fight continues!
+  - **Expanded Starter Template**: Clicking **`Template .JS`** in the Dev modal downloads a richly commented template demonstrating declarative stats/movement, multi-slot `actions`, `hooks` (`onTick`, `onBeforeDamaged`, `onBeforeDeath`), and `SDK` calls (`spawnSummon`, `spawnBarrier`, `shootProjectile`).

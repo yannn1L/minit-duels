@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for simplifying and compacting the Editor Scene UI and the unified Dev Mode / Workshop popup modal while preserving reliable portrait touch selection.",
-  "updatedAt": "2026-11-03T07:31:06.380889359Z",
+  "summary": "Implementation plan for expanding the Minit Builder & Combat Engine with full lifecycle hooks, multi-ability slots, custom movement AI, destroyable summons/clones/shields, and a high-level MinitSDK helper API.",
+  "updatedAt": "2026-11-04T04:06:44.804685316Z",
   "requestFeedback": true,
   "userFacing": true
 }

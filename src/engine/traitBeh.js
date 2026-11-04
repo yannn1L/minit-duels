@@ -11,28 +11,89 @@ export function registerTraitsAndTargeting() {
   // TARGETING BEHAVIORS
   // ============================================================
 
-  // Target the closest enemy
+  // Target the closest enemy (fighter or summon)
   MinitEngine.Registry.addTargeting('closest_enemy', (owner, arena) => {
+    const ownerTeam = owner.team || owner.id;
+    const enemies = arena.getOpposingActors ? arena.getOpposingActors(ownerTeam) : arena.players;
     let closestTarget = null;
     let minDistSq = Infinity;
 
-    for (let i = 0; i < arena.players.length; i++) {
-      const player = arena.players[i];
-      if (player.id !== owner.id && player.hp > 0) {
-        const dSq = FastMath.distSq(owner.x, owner.y, player.x, player.y);
+    for (let i = 0; i < enemies.length; i++) {
+      const actor = enemies[i];
+      if ((actor.team || actor.id) !== ownerTeam && actor.hp > 0 && !actor.untargetable) {
+        const dSq = FastMath.distSq(owner.x, owner.y, actor.x, actor.y);
         if (dSq < minDistSq) {
           minDistSq = dSq;
-          closestTarget = player;
+          closestTarget = actor;
         }
       }
     }
-
     return closestTarget;
+  });
+
+  // Target the farthest enemy
+  MinitEngine.Registry.addTargeting('farthest_enemy', (owner, arena) => {
+    const ownerTeam = owner.team || owner.id;
+    const enemies = arena.getOpposingActors ? arena.getOpposingActors(ownerTeam) : arena.players;
+    let farthest = null;
+    let maxDistSq = -1;
+
+    for (let i = 0; i < enemies.length; i++) {
+      const actor = enemies[i];
+      if ((actor.team || actor.id) !== ownerTeam && actor.hp > 0 && !actor.untargetable) {
+        const dSq = FastMath.distSq(owner.x, owner.y, actor.x, actor.y);
+        if (dSq > maxDistSq) {
+          maxDistSq = dSq;
+          farthest = actor;
+        }
+      }
+    }
+    return farthest;
+  });
+
+  // Target lowest HP enemy
+  MinitEngine.Registry.addTargeting('lowest_hp', (owner, arena) => {
+    const ownerTeam = owner.team || owner.id;
+    const enemies = arena.getOpposingActors ? arena.getOpposingActors(ownerTeam) : arena.players;
+    let best = null;
+    let minHp = Infinity;
+    for (let i = 0; i < enemies.length; i++) {
+      const actor = enemies[i];
+      if ((actor.team || actor.id) !== ownerTeam && actor.hp > 0 && !actor.untargetable) {
+        if (actor.hp < minHp) {
+          minHp = actor.hp;
+          best = actor;
+        }
+      }
+    }
+    return best;
+  });
+
+  // Target highest HP enemy
+  MinitEngine.Registry.addTargeting('highest_hp', (owner, arena) => {
+    const ownerTeam = owner.team || owner.id;
+    const enemies = arena.getOpposingActors ? arena.getOpposingActors(ownerTeam) : arena.players;
+    let best = null;
+    let maxHp = -1;
+    for (let i = 0; i < enemies.length; i++) {
+      const actor = enemies[i];
+      if ((actor.team || actor.id) !== ownerTeam && actor.hp > 0 && !actor.untargetable) {
+        if (actor.hp > maxHp) {
+          maxHp = actor.hp;
+          best = actor;
+        }
+      }
+    }
+    return best;
   });
 
   // Target a random enemy
   MinitEngine.Registry.addTargeting('random_enemy', (owner, arena) => {
-    const enemies = arena.players.filter((p) => p.id !== owner.id && p.hp > 0);
+    const ownerTeam = owner.team || owner.id;
+    const pool = arena.getOpposingActors ? arena.getOpposingActors(ownerTeam) : arena.players;
+    const enemies = pool.filter(
+      (p) => (p.team || p.id) !== ownerTeam && p.hp > 0 && !p.untargetable
+    );
     return enemies.length > 0 ? enemies[(FastMath.rand() * enemies.length) | 0] : null;
   });
 
@@ -330,7 +391,7 @@ export function registerTraitsAndTargeting() {
     }
   });
 
-  // Universal: Damage in radius on hit
+  // Universal: Damage in radius on hit (supports fighters & summons)
   MinitEngine.Registry.addTrait('damageRadiusOnHit', (e, a) => {
     const owner = a.playerMap?.[e.p.ownerId] || a.players.find((p) => p.id === e.p.ownerId);
     const dMult = owner ? (owner.dmgMult || 1.0) : 1.0;
@@ -338,15 +399,16 @@ export function registerTraitsAndTargeting() {
     const rad = e.p.vfx?.radius || e.p.payload?.zoneRadius || 1.5;
     const radSq = rad * rad;
 
-    for (let pIdx = 0; pIdx < a.players.length; pIdx++) {
-      const p = a.players[pIdx];
+    const enemies = a.getOpposingActors ? a.getOpposingActors(e.p.ownerId) : a.players;
+    for (let pIdx = 0; pIdx < enemies.length; pIdx++) {
+      const p = enemies[pIdx];
       if (
-        e.p.ownerId !== p.id &&
+        (p.team || p.id) !== e.p.ownerId &&
         p.hp > 0 &&
         FastMath.distSq(e.x, e.y, p.x, p.y) < radSq
       ) {
         const finalDmg = e.p.payload.dmg * dMult;
-        a.damagePlayer(p.id, { ...e.p.payload, dmg: finalDmg }, e.p.color);
+        a.damageActor(p, { ...e.p.payload, dmg: finalDmg }, e.p.color, owner);
         hasHit = true;
       }
     }
@@ -585,8 +647,8 @@ export function registerTraitsAndTargeting() {
 
       if (cfg.trackTarget && target) {
         // Direct tracking damage
-        a.damagePlayer(
-          target.id,
+        a.damageActor(
+          target,
           {
             dmg: finalDmg,
             hitVfx: {
@@ -598,14 +660,16 @@ export function registerTraitsAndTargeting() {
               playSound: false
             }
           },
-          cfg.glowColor || e.p.color
+          cfg.glowColor || e.p.color,
+          owner
         );
         if (cfg.hitSound) AudioSys.play(cfg.hitSound, cfg.soundVolume || 0.3);
       } else {
-        // Line collision against all enemies
+        // Line collision against all enemies (fighters & summons)
         const beamRadius = cfg.beamRadius || (cfg.sheathWidth ? cfg.sheathWidth * 1.2 : 22);
-        a.players.forEach((p) => {
-          if (p.id !== owner.id && p.hp > 0) {
+        const enemies = a.getOpposingActors ? a.getOpposingActors(owner.id) : a.players;
+        enemies.forEach((p) => {
+          if ((p.team || p.id) !== owner.id && p.hp > 0) {
             const p_pX = p.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
             const p_pY = p.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
 
@@ -633,7 +697,7 @@ export function registerTraitsAndTargeting() {
                 };
               }
 
-              a.damagePlayer(p.id, dmgPayload, cfg.glowColor || e.p.color);
+              a.damageActor(p, dmgPayload, cfg.glowColor || e.p.color, owner);
               if (cfg.hitSound) AudioSys.play(cfg.hitSound, cfg.soundVolume || 0.3);
             }
           }
@@ -644,6 +708,233 @@ export function registerTraitsAndTargeting() {
     if (--e.l <= 0) {
       if (a.beamRenderer) a.beamRenderer.removeBeam(e.p.beamId);
       e.dead = true;
+    }
+  });
+
+  // ============================================================
+  // UNIVERSAL SDK PROJECTILE TRAIT
+  // Supports homing, bounce, pierce, trails & custom callbacks
+  // ============================================================
+  MinitEngine.Registry.addTrait('sdkProjectile', (e, a) => {
+    const cfg = e.p.sdkProjCfg;
+    if (!cfg) return;
+
+    const owner = a.getActorById(e.p.sourceActorId || e.p.ownerId);
+    const dMult = owner ? (owner.dmgMult || 1.0) : 1.0;
+
+    // Optional homing steering
+    if (cfg.homing) {
+      const tgt = a.getValidTarget(e.p.ownerId, { type: 'closest_enemy' });
+      if (tgt) {
+        const desiredAng = FastMath.angle(e.x, e.y, tgt.x, tgt.y);
+        const curAng = Math.atan2(e.dy, e.dx);
+        let diff = desiredAng - curAng;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const nextAng = curAng + FastMath.clamp(diff, -(cfg.turnRate || 0.08), cfg.turnRate || 0.08);
+        const spd = cfg.speed || Math.hypot(e.dx, e.dy) || 0.35;
+        e.dx = Math.cos(nextAng) * spd;
+        e.dy = Math.sin(nextAng) * spd;
+      }
+    }
+
+    // Move if moveAndBounce is not already handling movement
+    if (!e.traits.includes('moveAndBounce')) {
+      e.x += e.dx;
+      e.y += e.dy;
+      e.curX = e.x;
+      e.curY = e.y;
+    }
+
+    // Render projectile visual & trail
+    if (!a.isHeadless) {
+      const pX = e.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      const pY = e.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+      a.fxPool.spawnPhysics(
+        cfg.tex || 'fx_spark',
+        pX,
+        pY,
+        0,
+        0,
+        2,
+        1,
+        1,
+        false,
+        cfg.tint ?? e.p.color ?? 0xffffff
+      );
+      if (cfg.trailTex && e.l % 2 === 0) {
+        a.fxPool.spawnPhysics(
+          cfg.trailTex,
+          pX,
+          pY,
+          -e.dx * 1.2,
+          -e.dy * 1.2,
+          8,
+          0.88,
+          0.88,
+          true,
+          cfg.tint ?? e.p.color ?? 0xffffff
+        );
+      }
+    }
+
+    if (typeof cfg.onTick === 'function') {
+      cfg.onTick(e, a);
+    }
+
+    // Collision against opposing actors (fighters & summons)
+    const rad = cfg.radius || 1.1;
+    const radSq = rad * rad;
+    const enemies = a.getOpposingActors(e.p.ownerId);
+
+    for (let i = 0; i < enemies.length; i++) {
+      const tgt = enemies[i];
+      if (tgt.hp > 0 && FastMath.distSq(e.x, e.y, tgt.x, tgt.y) <= radSq) {
+        if (cfg.pierce) {
+          e.p._hitSet = e.p._hitSet || new Set();
+          if (e.p._hitSet.has(tgt.id)) continue;
+          e.p._hitSet.add(tgt.id);
+        }
+
+        const dmgPayload = {
+          dmg: cfg.dmg * dMult,
+          hitVfx: cfg.hitVfx
+        };
+        if (cfg.knockbackForce) {
+          dmgPayload.knockback = {
+            fromX: e.x,
+            fromY: e.y,
+            force: cfg.knockbackForce,
+            shake: cfg.hitVfx?.shake || 4
+          };
+        }
+
+        a.damageActor(tgt, dmgPayload, e.p.color, owner);
+        if (typeof cfg.onHit === 'function') {
+          cfg.onHit(e, tgt, a);
+        }
+        if (cfg.destroyOnHit !== false) {
+          e.dead = true;
+          break;
+        }
+      }
+    }
+
+    if ((e.dead || e.l <= 1) && typeof cfg.onExpire === 'function' && !e.p._expiredCalled) {
+      e.p._expiredCalled = true;
+      cfg.onExpire(e, a);
+    }
+  });
+
+  // ============================================================
+  // UNIVERSAL SDK BARRIER / PROJECTILE-BLOCKING SHIELD TRAIT
+  // Intercepts or reflects incoming enemy projectiles & pushes foes
+  // ============================================================
+  MinitEngine.Registry.addTrait('sdkBarrier', (e, a) => {
+    const bCfg = e.p.barrierCfg;
+    if (!bCfg || bCfg.hp <= 0) {
+      e.dead = true;
+      return;
+    }
+
+    const owner = a.getActorById(e.p.sourceActorId || e.p.ownerId);
+    if (bCfg.followOwner && owner && owner.hp > 0) {
+      if (bCfg.orbitRadius > 0) {
+        bCfg.orbitAngle = (bCfg.orbitAngle || 0) + (bCfg.orbitSpeed || 0.08);
+        e.x = owner.x + Math.cos(bCfg.orbitAngle) * bCfg.orbitRadius;
+        e.y = owner.y + Math.sin(bCfg.orbitAngle) * bCfg.orbitRadius;
+      } else {
+        e.x = owner.x;
+        e.y = owner.y;
+      }
+    }
+
+    const rad = bCfg.radius || 1.4;
+    const radSq = rad * rad;
+
+    // 1. Intercept or reflect enemy projectiles inside `a.actE`
+    if (bCfg.blocksProjectiles !== false) {
+      for (let i = 0; i < a.actE.length; i++) {
+        const other = a.actE[i];
+        if (
+          other === e ||
+          other.dead ||
+          other.p?.ownerId === e.p.ownerId ||
+          other.p?.isBarrier ||
+          other.p?.beamId
+        ) {
+          continue;
+        }
+        const isMovingProj =
+          other.p?.isProjectile ||
+          other.dx !== 0 ||
+          other.dy !== 0 ||
+          other.traits.includes('moveAndBounce') ||
+          other.traits.includes('sdkProjectile');
+
+        if (!isMovingProj) continue;
+
+        if (FastMath.distSq(e.x, e.y, other.x, other.y) <= radSq) {
+          const projDmg = other.p?.payload?.dmg || other.p?.sdkProjCfg?.dmg || 25;
+          bCfg.hp -= projDmg;
+
+          if (bCfg.reflectProjectiles) {
+            other.dx = -other.dx * 1.15;
+            other.dy = -other.dy * 1.15;
+            other.p.ownerId = e.p.ownerId;
+            other.p.color = e.p.color;
+            if (!a.isHeadless) {
+              const pX = other.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+              const pY = other.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+              a.fxPool.spawnShockwave(pX, pY, e.p.color, 36, 3);
+              AudioSys.play('bounce', 0.5);
+            }
+          } else {
+            other.dead = true;
+            if (!a.isHeadless) {
+              const pX = other.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
+              const pY = other.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
+              a.fxPool.spawnShockwave(pX, pY, e.p.color, 30, 2);
+              AudioSys.play('hit', 0.35);
+            }
+          }
+
+          if (bCfg.hp <= 0) {
+            e.dead = true;
+            return;
+          }
+        }
+      }
+    }
+
+    // 2. Push enemies or deal contact damage
+    if (bCfg.pushEnemies || bCfg.contactDmg > 0) {
+      const enemies = a.getOpposingActors(e.p.ownerId);
+      const isTick = e.l % (bCfg.tickRate || 10) === 0;
+      for (let i = 0; i < enemies.length; i++) {
+        const en = enemies[i];
+        if (en.hp > 0 && FastMath.distSq(e.x, e.y, en.x, en.y) <= radSq) {
+          if (bCfg.pushEnemies) {
+            a.applyKnockback(en.id, {
+              fromX: e.x,
+              fromY: e.y,
+              force: 0.45,
+              shake: 2
+            });
+          }
+          if (bCfg.contactDmg > 0 && isTick) {
+            a.damageActor(
+              en,
+              {
+                dmg: bCfg.contactDmg,
+                hitVfx: { shake: 2, flash: 0, particleCount: 3, playSound: false }
+              },
+              e.p.color,
+              owner
+            );
+          }
+        }
+      }
     }
   });
 }

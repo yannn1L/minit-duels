@@ -220,18 +220,41 @@ export const MINIT_EXAMPLE = {
   color: 0x00ffcc,                // Hex theme color (used for HUD bars, shockwaves, hit numbers)
   desc: 'Short ability summary',  // Shown in tooltips & Workshop
 
-  // 2. BASE STATS
+  // 2. BASE STATS (Supports HP, Speed, Shields, Armor, Energy & Scale)
   stats: {
     hp: 1200,                     // Starting & Maximum Hit Points (Standard range: 1000 - 1500)
-    speed: 0.14                   // Movement speed in Grid Units per tick (Standard: 0.08 - 0.20)
+    speed: 0.14,                  // Movement speed in Grid Units per tick (Standard: 0.08 - 0.20)
+    shield: 120,                  // Optional starting absorption shield
+    maxShield: 200,               // Optional max shield capacity
+    shieldRegen: 0.1,             // Optional shield points regenerated per tick
+    armor: 2,                     // Optional flat damage reduction per hit
+    energy: 0,                    // Optional starting energy/mana
+    maxEnergy: 100,               // Optional max energy capacity
+    energyRegen: 0.25,            // Optional energy regenerated per tick
+    scale: 1.0                    // Base sprite size multiplier
   },
 
   // 3. TARGETING RULE
   targeting: {
-    type: 'closest_enemy'         // Built-in: 'closest_enemy' or 'random_enemy'
+    // Built-in: 'closest_enemy', 'farthest_enemy', 'lowest_hp', 'highest_hp', 'random_enemy'
+    type: 'closest_enemy'
   },
 
-  // 4. DEATH VFX (Triggered when HP hits 0)
+  // 4. PLUGGABLE MOVEMENT AI (Optional - defaults to 'wander')
+  // Built-in modes: 'wander' | 'chase' | 'kite' | 'orbit' | 'strafe' | 'stationary' | 'teleport_step' | 'custom'
+  movement: {
+    type: 'kite',                 // Retreats when enemy is too close, approaches when too far, strafes at ideal range
+    minDist: 3.0,
+    maxDist: 5.5
+  },
+
+  // 5. INITIAL STATE (Cloned into `self.state` at the start of every match)
+  initialState: {
+    hasRevived: false,
+    comboCount: 0
+  },
+
+  // 6. DEATH VFX (Triggered when HP hits 0)
   deathVfx: {
     shake: 12,                    // Screen shake intensity
     flash: 0.65,                  // Full-arena white flash alpha (0.0 - 1.0)
@@ -241,68 +264,137 @@ export const MINIT_EXAMPLE = {
     hitStop: 12                   // Freeze-frame ticks on death impact
   },
 
-  // 5. PAYLOAD (Passed to every spawned entity as `e.p.payload`)
+  // 7. PAYLOAD (Passed to spawned entities as `e.p.payload`)
   payload: {
     dmg: 40,                      // Base damage (used by universal traits or your custom traits)
-    zoneRadius: 1.2,              // Hitbox radius in Grid Units (1.0 grid unit = 20px)
+    zoneRadius: 1.2,              // Hitbox radius in Grid Units
     knockbackForce: 0.75,         // Knockback velocity impulse (if using knockbackOnHit)
     destroyOnHit: true,           // Whether projectile despawns after hitting an enemy
-    hitVfx: {                     // Visual/audio feedback when `a.damagePlayer` is called
-      shake: 4,                   // Screen shake on hit
-      flash: 0.15,                // Screen flash alpha on hit
-      particleCount: 6,           // Hit sparks count
-      particleTex: 'fx_spark',    // Texture key for hit sparks
-      sound: 'hit',               // Sound key played on hit
-      playSound: true,            // Set false on rapid DoT ticks to avoid audio spam
-      showText: true,             // Whether to pop up floating bitmap damage numbers
-      textScale: 1.0,             // Scale multiplier for damage numbers (e.g. 2.2 for crits!)
-      hitStop: 2                  // Impact freeze frames (1-2 for normal hits, 8-15 for heavies)
+    hitVfx: {                     // Visual/audio feedback when damage is dealt
+      shake: 4,
+      flash: 0.15,
+      particleCount: 6,
+      particleTex: 'fx_spark',
+      sound: 'hit',
+      playSound: true,
+      showText: true,
+      textScale: 1.0,
+      hitStop: 2
     }
   },
 
-  // 6. ACTION LOOP (Triggered automatically every `cd` ticks)
+  // 8A. SINGLE PRIMARY ACTION (Classic mode)
   action: {
     cd: 90,                       // Cooldown in ticks (60 ticks = 1.0 second)
     count: 1,                     // Number of entities spawned per action trigger
     speed: 0.4,                   // Initial entity speed toward target (Grid Units / tick)
     life: 60,                     // Entity lifespan in ticks (60 ticks = 1.0 second)
-    scatterSpread: 0.0,           // Random angular cone spread in radians (e.g. 0.3 for shotgun)
+    scatterSpread: 0.0,           // Random angular cone spread in radians
     sound: 'pew',                 // Sound key played when the action fires
-    vfx: {                        // Optional entity visual metadata (passed as `e.p.vfx`)
-      shake: 2,
-      radius: 1.2,
-      trailTex: 'fx_spark',
-      trailDragX: 0.9,
-      trailDragY: 0.9
-    },
-    // Ordered list of traits executed every tick on each spawned entity:
     traitList: ['moveAndBounce', 'damageRadiusOnHit', 'ageLife']
   },
 
-  // 7. BASE SPRITE TEXTURES
+  // 8B. MULTI-SLOT ABILITIES (Optional - define any number of independent cooldown slots!)
+  actions: [
+    {
+      id: 'primary_shot',
+      name: 'Twin Shot',
+      cd: 75,
+      onExecute: (self, target, arena) => {
+        arena.shootProjectile(self, {
+          target,
+          count: 2,
+          spread: 0.2,
+          speed: 0.4,
+          life: 55,
+          dmg: 30,
+          homing: true,
+          bounce: true,
+          sound: 'pew'
+        });
+      }
+    },
+    {
+      id: 'reflect_shield',
+      name: 'Reflect Barrier',
+      cd: 240,
+      initialCd: 120,
+      energyCost: 0,
+      minHpPct: 0.0,
+      maxHpPct: 1.0,
+      condition: (self, target, arena) => true,
+      onExecute: (self, target, arena) => {
+        arena.spawnBarrier(self, {
+          radius: 1.4,
+          hp: 180,
+          life: 140,
+          followOwner: true,
+          reflectProjectiles: true,
+          pushEnemies: true
+        });
+      }
+    }
+  ],
+
+  // 9. FULL LIFECYCLE HOOKS (Optional - intercept or script any combat event!)
+  hooks: {
+    onInit: (self, arena) => {},
+    onTick: (self, arena) => {},
+    onMove: (self, target, arena) => {},
+    onAction: (self, target, slot, arena) => {},
+    onWallBounce: (self, axis, arena) => {},
+    onBeforeDealDamage: (self, dmgCtx, arena) => {},
+    onDealDamage: (self, target, dmg, arena) => {},
+    onBeforeDamaged: (self, dmgCtx, arena) => {
+      // Modify `dmgCtx.dmg` or set `dmgCtx.cancel = true` to dodge/parry!
+    },
+    onDamaged: (self, dmg, attacker, arena) => {},
+    onBeforeDeath: (self, arena) => {
+      // Heal `self.hp > 0` inside `onBeforeDeath` to trigger a Revive or Boss Phase 2!
+    },
+    onDeath: (self, killer, arena) => {},
+    onKill: (self, victim, arena) => {}
+  },
+
+  // 10. BASE SPRITE TEXTURES
   textures: {
     // Automatically synced with `<filename>.png` when imported via Workshop!
     base: './assets/minit_icon/example.png'
   },
 
-  // 8. CUSTOM PROCEDURAL TEXTURES (Baked to GPU at startup/import)
+  // 11. CUSTOM PROCEDURAL TEXTURES (Baked to GPU at startup/import)
   customTextures: {
     // key: (PIXI.Graphics) => void
   },
 
-  // 9. CUSTOM SYNTHESIZED AUDIO (Registered into AudioSys)
+  // 12. CUSTOM SYNTHESIZED AUDIO (Registered into AudioSys)
   customAudio: {
     // key: AudioDefinitionObject
   },
 
-  // 10. CUSTOM TRAIT FUNCTIONS (Registered into MinitEngine.Registry.traits)
+  // 13. CUSTOM TRAIT FUNCTIONS (Registered into MinitEngine.Registry.traits)
   customTraits: {
     // traitName: (entity, arena) => void
   }
 };
 ```
 
-> **Note for Workshop Importers**: When importing via the in-game Workshop, `CustomMinitManager` automatically injects `CFG`, `PALETTE`, `UI_STYLE`, `FastMath`, `AudioSys`, `MinitEngine`, `Textures`, and `PIXI` into your script's scope. Standard `import` statements at the top of your `.js` file are safely stripped and resolved automatically, and you can use `export const MINIT_NAME = { ... }`, `export default { ... }`, or `module.exports = { ... }`.
+### High-Level `MinitSDK` & `arena` Helper Methods
+Inside any `onExecute` or `hooks` function, you can call these high-level methods directly on `arena` (or `MinitSDK` / `SDK`):
+- **`arena.shootProjectile(self, options)`**: Fires customizable projectiles (`count`, `spread`, `speed`, `life`, `dmg`, `radius`, `homing`, `turnRate`, `bounce`, `pierce`, `knockbackForce`, `tex`, `trailTex`, `onTick`, `onHit`, `onExpire`).
+- **`arena.fireBeam(self, options)`**: Fires a glowing vector beam (`trackTarget`, `aimAngle`, `life`, `dmg`, `tickRate`, `coreColor`, `sheathColor`, `glowColor`, `recoilForce`, `knockbackForce`).
+- **`arena.dealAreaDamage(self, x, y, radius, dmg, options)`**: Instant AOE blast with shockwave and optional knockback.
+- **`arena.spawnSummon(self, cfg)`**: Spawns a destroyable combat minion (`hp`, `speed`, `scale`, `movement`, `action`, `contactDmg`, `life`) with its own sprite and mini-HP bar.
+- **`arena.spawnClone(self, cfg)`**: Spawns a clone of `self` (`hpPct`, `dmgMult`, `life`, `movement`).
+- **`arena.spawnTurret(self, cfg)`**: Spawns a stationary turret (`hp`, `cd`, `dmg`, `projSpeed`, `life`) that shoots at enemies.
+- **`arena.spawnBarrier(self, cfg)`**: Spawns a protective shield field (`radius`, `hp`, `life`, `followOwner`, `orbitRadius`, `blocksProjectiles`, `reflectProjectiles`, `pushEnemies`, `contactDmg`).
+- **`arena.teleport(self, x, y, options)`**: Blinks `self` to `(x, y)` with departure/arrival shockwaves.
+- **`arena.dash(self, targetOrAngle, speed, durationTicks, options)`**: High-speed directional burst dash.
+- **`arena.heal(self, amount)`** & **`arena.addShield(self, amount, maxShield)`**: Restores HP or grants a glowing absorption shield.
+- **`arena.applyStatus(self, target, { stunTicks, slowTicks, slowMult, invulnTicks, dmg, duration })`**: Inflicts crowd control or DoTs.
+- **`arena.setPhase(self, phasePatch)`**: Dynamically transforms stats, sprite texture, color, movement AI, or actions mid-battle.
+
+> **Note for Workshop Importers**: When importing via the in-game Workshop, `CustomMinitManager` automatically injects `CFG`, `PALETTE`, `UI_STYLE`, `FastMath`, `AudioSys`, `MinitEngine`, `Textures`, `PIXI`, `MinitSDK`, and `SDK` into your script's scope.
 
 ---
 

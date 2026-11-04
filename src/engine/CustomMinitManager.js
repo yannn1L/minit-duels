@@ -9,6 +9,7 @@ import { AudioSys } from './AudioSys.js';
 import { MinitEngine } from './Registry.js';
 import { AssetBaker, Textures } from './AssetBaker.js';
 import { validateAndSanitizeMinit } from './MinitContract.js';
+import { MinitSDK } from './MinitSDK.js';
 
 const STORAGE_KEY = 'minit_duels_custom_minits_v1';
 const PENDING_ASSETS_KEY = 'minit_duels_pending_assets_v1';
@@ -142,12 +143,24 @@ return null;`;
     'MinitEngine',
     'Textures',
     'PIXI',
+    'MinitSDK',
+    'SDK',
     body
   );
 
   const rawDef =
-    factory(CFG, PALETTE, UI_STYLE, FastMath, AudioSys, proxyMinitEngine, Textures, PIXI) ||
-    directAddedMinit;
+    factory(
+      CFG,
+      PALETTE,
+      UI_STYLE,
+      FastMath,
+      AudioSys,
+      proxyMinitEngine,
+      Textures,
+      PIXI,
+      MinitSDK,
+      MinitSDK
+    ) || directAddedMinit;
 
   if (!rawDef || typeof rawDef !== 'object') {
     throw new Error(
@@ -513,70 +526,166 @@ export class CustomMinitManager {
   }
 
   /**
-   * Generates a starter Minit .js template file for creators.
+   * Generates a comprehensive Universal Minit Builder starter template for creators.
    */
   static getStarterTemplateSource(stem = 'nova') {
     const cleanId = stem.replace(/[^a-z0-9_]/gi, '_').toLowerCase() || 'nova';
     const constName = `MINIT_${cleanId.toUpperCase()}`;
     return `// ============================================================
-// CUSTOM MINIT: ${cleanId.toUpperCase()}
-// Save this file as "${cleanId}.js" and pair it with "${cleanId}.png"
-// Both files will automatically sync when imported in Workshop!
+// UNIVERSAL MINIT BUILDER TEMPLATE: ${cleanId.toUpperCase()}
+// Save as "${cleanId}.js" + optional "${cleanId}.png" (auto-synced!)
+// Demonstrates: Movement AI, Multi-Slot Abilities, Shields,
+// Summons/Clones, Projectile-Blocking Barriers & Lifecycle Hooks
 // ============================================================
 import { CFG } from '../config.js';
 import { FastMath } from '../engine/FastMath.js';
 import { AudioSys } from '../engine/AudioSys.js';
+import { MinitSDK } from '../engine/MinitSDK.js';
 
 export const ${constName} = {
   id: '${cleanId}',
   name: '${cleanId.toUpperCase()}',
   color: 0x00ffcc,
-  desc: 'Fires twin plasma bolts & shockwave nova.',
+  desc: 'Kiting plasma caster with reflective barrier, clone summon & phoenix revive.',
+
+  // 1. STATS (Supports hp, speed, shield, maxShield, shieldRegen, armor, scale)
   stats: {
-    hp: 1200,
-    speed: 0.14
+    hp: 1150,
+    speed: 0.14,
+    shield: 120,
+    maxShield: 200,
+    shieldRegen: 0.15,
+    armor: 2
   },
+
+  // 2. TARGETING ('closest_enemy' | 'farthest_enemy' | 'lowest_hp' | 'highest_hp' | 'random_enemy')
   targeting: { type: 'closest_enemy' },
 
-  deathVfx: {
-    shake: 12,
-    flash: 0.65,
-    particleCount: 28,
-    shockRad: 140,
-    sound: 'explosion',
-    hitStop: 12
+  // 3. MOVEMENT AI ('wander' | 'chase' | 'kite' | 'orbit' | 'strafe' | 'stationary' | 'teleport_step' | 'custom')
+  movement: {
+    type: 'kite',
+    minDist: 3.0,
+    maxDist: 5.5
   },
 
-  payload: {
-    dmg: 42,
-    zoneRadius: 1.2,
-    destroyOnHit: true,
-    hitVfx: {
-      shake: 4,
-      flash: 0.15,
-      particleCount: 6,
-      particleTex: 'fx_${cleanId}_spark',
-      sound: '${cleanId}_hit',
-      playSound: true,
-      hitStop: 2
+  // 4. INITIAL CUSTOM STATE (Cloned into self.state at match start)
+  initialState: {
+    hasRevived: false,
+    comboCount: 0
+  },
+
+  // 5. MULTI-SLOT ABILITIES (Each slot runs on its own independent cooldown & conditions!)
+  actions: [
+    // Slot 1: Twin Homing Plasma Bolts (every 75 ticks / 1.25s)
+    {
+      id: 'plasma_bolts',
+      name: 'Plasma Bolts',
+      cd: 75,
+      onExecute: (self, target, arena) => {
+        arena.shootProjectile(self, {
+          target,
+          count: 2,
+          spread: 0.22,
+          speed: 0.4,
+          life: 55,
+          dmg: 32,
+          homing: true,
+          turnRate: 0.05,
+          bounce: true,
+          tex: 'fx_${cleanId}_orb',
+          trailTex: 'fx_${cleanId}_spark',
+          sound: '${cleanId}_fire'
+        });
+      }
+    },
+
+    // Slot 2: Reflective Energy Barrier (every 240 ticks / 4.0s)
+    {
+      id: 'energy_barrier',
+      name: 'Reflect Barrier',
+      cd: 240,
+      initialCd: 120,
+      onExecute: (self, target, arena) => {
+        arena.spawnBarrier(self, {
+          radius: 1.45,
+          hp: 180,
+          life: 140,
+          followOwner: true,
+          reflectProjectiles: true,
+          pushEnemies: true,
+          contactDmg: 10
+        });
+      }
+    },
+
+    // Slot 3: Summon Holo-Clone when below 75% HP (every 320 ticks)
+    {
+      id: 'holo_clone',
+      name: 'Holo Clone',
+      cd: 320,
+      maxHpPct: 0.75,
+      onExecute: (self, target, arena) => {
+        arena.spawnClone(self, {
+          hpPct: 0.25,
+          dmgMult: 0.45,
+          life: 300,
+          movement: { type: 'chase' }
+        });
+      }
+    }
+  ],
+
+  // 6. FULL LIFECYCLE HOOKS (Optional - customize any moment in combat!)
+  hooks: {
+    onInit: (self, arena) => {
+      // Called when the duel starts
+    },
+
+    onTick: (self, arena) => {
+      // Called every frame (60Hz)
+    },
+
+    onDealDamage: (self, target, dmg, arena) => {
+      // Every 4th hit grants a small shield boost
+      self.state.comboCount = (self.state.comboCount || 0) + 1;
+      if (self.state.comboCount % 4 === 0) {
+        arena.addShield(self, 25, 200);
+      }
+    },
+
+    onBeforeDamaged: (self, dmgCtx, arena) => {
+      // Example: 10% chance to phase-dodge an incoming hit and blink away
+      if (FastMath.rand() < 0.1) {
+        dmgCtx.cancel = true;
+        arena.teleport(
+          self,
+          FastMath.randRange(1.5, 8.5),
+          FastMath.randRange(1.5, 8.5),
+          { color: self.def.color }
+        );
+      }
+    },
+
+    onBeforeDeath: (self, arena) => {
+      // One-time Phoenix Overdrive Revive at 25% HP!
+      if (!self.state.hasRevived) {
+        self.state.hasRevived = true;
+        arena.heal(self, Math.round(self.maxHp * 0.25));
+        arena.addShield(self, 150, 250);
+        arena.dealAreaDamage(self, self.x, self.y, 2.5, 55, {
+          knockbackForce: 1.1,
+          sound: 'explosion'
+        });
+      }
     }
   },
 
-  action: {
-    cd: 85,
-    count: 2,
-    speed: 0.42,
-    life: 50,
-    scatterSpread: 0.18,
-    sound: '${cleanId}_fire',
-    traitList: ['moveAndBounce', 'damageRadiusOnHit', '${cleanId}BoltTrail', 'ageLife']
-  },
-
-  // Automatically synced with "${cleanId}.png" when imported!
+  // 7. BASE SPRITE (Auto-synced with "${cleanId}.png" when imported!)
   textures: {
     base: './assets/minit_icon/${cleanId}.png'
   },
 
+  // 8. PROCEDURAL VFX TEXTURES
   customTextures: {
     fx_${cleanId}_orb: (g) => {
       g.beginFill(0x00ffcc, 0.4).drawCircle(0, 0, 7);
@@ -587,6 +696,7 @@ export const ${constName} = {
     }
   },
 
+  // 9. SYNTHESIZED RETRO AUDIO
   customAudio: {
     ${cleanId}_fire: {
       t: 'sawtooth',
@@ -596,37 +706,6 @@ export const ${constName} = {
       d: 0.14,
       ramp: 'exp',
       throttle: 0.04
-    },
-    ${cleanId}_hit: {
-      t: 'square',
-      f0: 520,
-      f1: 90,
-      v: 0.16,
-      d: 0.1,
-      ramp: 'exp',
-      throttle: 0.04
-    }
-  },
-
-  customTraits: {
-    ${cleanId}BoltTrail: (e, a) => {
-      const pX = e.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
-      const pY = e.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
-      a.fxPool.spawnPhysics('fx_${cleanId}_orb', pX, pY, 0, 0, 2, 1, 1, false, 0xffffff);
-      if (e.l % 2 === 0) {
-        a.fxPool.spawnPhysics(
-          'fx_${cleanId}_spark',
-          pX,
-          pY,
-          -e.dx * 1.2,
-          -e.dy * 1.2,
-          8,
-          0.88,
-          0.88,
-          true,
-          0x00ffcc
-        );
-      }
     }
   }
 };
