@@ -11,6 +11,7 @@ import { MINIT_MOTH } from './moth.js';
 import { MINIT_MURASAKI } from './murasaki.js';
 import { MINIT_IRONMEN } from './ironmen.js';
 import { MINIT_SAITAMA } from './saitama.js';
+import { MINIT_SCHRODINGER } from './schrodinger.js';
 
 export const ALL_MINITS = [
   MINIT_LASER,
@@ -20,7 +21,8 @@ export const ALL_MINITS = [
   MINIT_MOTH,
   MINIT_MURASAKI,
   MINIT_IRONMEN,
-  MINIT_SAITAMA
+  MINIT_SAITAMA,
+  MINIT_SCHRODINGER
 ];
 
 export function registerAllMinits() {
@@ -49,5 +51,6 @@ export {
   MINIT_MOTH,
   MINIT_MURASAKI,
   MINIT_IRONMEN,
-  MINIT_SAITAMA
+  MINIT_SAITAMA,
+  MINIT_SCHRODINGER
 };

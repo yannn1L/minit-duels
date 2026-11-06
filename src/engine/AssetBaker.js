@@ -35,6 +35,17 @@ function createFallbackTexture(app, color = 0x00e5ff) {
 }
 
 export class AssetBaker {
+  static getOrCreateMinitBaseTexture(app, minitDef) {
+    if (!minitDef) return PIXI.Texture.WHITE;
+    const key = `minit_${minitDef.id}_base`;
+    if (Textures[key]) return Textures[key];
+    if (app?.renderer) {
+      Textures[key] = createFallbackTexture(app, minitDef.color || 0x00e5ff);
+      return Textures[key];
+    }
+    return PIXI.Texture.WHITE;
+  }
+
   static async bakeKeyList(app, keys) {
     if (!app || !keys || keys.length === 0) return;
 

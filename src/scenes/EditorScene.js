@@ -6,7 +6,7 @@ import * as PIXI from 'pixi.js';
 import { CFG, PALETTE, UI_STYLE } from '../config.js';
 import { AudioSys } from '../engine/AudioSys.js';
 import { MinitEngine } from '../engine/Registry.js';
-import { Textures } from '../engine/AssetBaker.js';
+import { AssetBaker, Textures } from '../engine/AssetBaker.js';
 import { CustomMinitManager } from '../engine/CustomMinitManager.js';
 import { DebugConfig } from '../engine/DebugConfig.js';
 import { SceneManager } from '../engine/SceneManager.js';
@@ -203,7 +203,11 @@ export class EditorScene extends PIXI.Container {
     if (!this.iC) return;
     this.iC.removeChildren();
     this.sel.forEach((id, idx) => {
-      const sp = new PIXI.Sprite(Textures[`minit_${id}_base`] || PIXI.Texture.WHITE);
+      const mDef = MinitEngine.Registry.getMinit(id);
+      const tex =
+        Textures[`minit_${id}_base`] ||
+        AssetBaker.getOrCreateMinitBaseTexture(SceneManager.app, mDef || { id, color: 0x00e5ff });
+      const sp = new PIXI.Sprite(tex);
       sp.anchor.set(0.5);
       sp.scale.set(2.4);
       sp.x = Math.round(idx * 48 - (this.sel.length - 1) * 24);
@@ -319,8 +323,10 @@ export class EditorScene extends PIXI.Container {
     c.addChild(bg, bdr);
 
     // 16x16 Pixel Art Icon
-    const icTex = Textures[`minit_${d.id}_base`];
-    const ic = new PIXI.Sprite(icTex || PIXI.Texture.WHITE);
+    const icTex =
+      Textures[`minit_${d.id}_base`] ||
+      AssetBaker.getOrCreateMinitBaseTexture(SceneManager.app, d);
+    const ic = new PIXI.Sprite(icTex);
     ic.anchor.set(0.5);
     ic.scale.set(cCfg.icon.scale);
     ic.position.set(Math.round(cCfg.icon.x), Math.round(cCfg.icon.y));

@@ -639,7 +639,19 @@ export class CustomMinitManager {
    * Called at game startup before AssetBaker.bake(app) to restore all custom minits.
    */
   static hydrateFromStorage() {
-    const records = this.getStoredRecords();
+    const rawRecords = this.getStoredRecords();
+    // Filter out any legacy custom schrodinger records since Schrodinger is now a core built-in Minit in src/minits/
+    const records = rawRecords.filter(
+      (r) =>
+        r &&
+        r.id !== 'schrodinger' &&
+        r.id !== 'schrodinger_mod' &&
+        r.fileStem !== 'schrodinger'
+    );
+    if (records.length !== rawRecords.length) {
+      this.saveStoredRecords(records);
+    }
+
     const hydrated = [];
     for (const rec of records) {
       try {
@@ -648,35 +660,6 @@ export class CustomMinitManager {
       } catch (err) {
         console.warn(`[CustomMinitManager] Skipping corrupted custom minit "${rec?.id}":`, err);
       }
-    }
-
-    // Auto-load the user's attached schrodinger.js if not yet in localStorage
-    if (!records.some((r) => r.id === 'schrodinger' || r.fileStem === 'schrodinger')) {
-      fetch('./assets/aistudio/schrodinger_d96797f5.js')
-        .then((res) => (res.ok ? res.text() : null))
-        .then(async (jsSource) => {
-          if (!jsSource) return;
-          const currentRecords = this.getStoredRecords();
-          if (currentRecords.some((r) => r.id === 'schrodinger' || r.fileStem === 'schrodinger')) return;
-          const newRec = {
-            id: 'schrodinger',
-            name: 'SCHRODINGER',
-            fileStem: 'schrodinger',
-            fileName: 'schrodinger.js',
-            jsSource,
-            assets: {},
-            updatedAt: Date.now()
-          };
-          const { registered } = this.instantiateRecord(newRec);
-          if (registered) {
-            currentRecords.push(newRec);
-            this.saveStoredRecords(currentRecords);
-            if (window.__PIXI_APP__) {
-              await AssetBaker.bakeSingleMinit(window.__PIXI_APP__, registered);
-            }
-          }
-        })
-        .catch(() => {});
     }
 
     return hydrated;
