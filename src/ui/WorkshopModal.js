@@ -874,6 +874,11 @@ export class WorkshopModal {
           </div>
         </div>
 
+        <div class="mw-toggle-row" style="padding:4px 0 8px 0;margin-bottom:4px;border-bottom:1px solid #1e293b;">
+          <span style="color:#00ffcc;font-weight:bold;">Connected 3-Layer Ring & Zone FX</span>
+          <input type="checkbox" class="mw-checkbox" data-chk-key="vfxConnectedLayers" ${dbg.vfxConnectedLayers !== false ? 'checked' : ''} />
+        </div>
+
         <div class="mw-slider-row">
           <span>Particle Density</span>
           <input type="range" class="mw-range" min="0.2" max="2.5" step="0.05" value="${dbg.vfxParticleMult ?? 1.0}" data-range-key="vfxParticleMult" data-unit="mult" />
@@ -935,6 +940,10 @@ export class WorkshopModal {
         </div>
 
         <div class="mw-subgrid-2">
+          <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
+            <span>Connected Layered FX</span>
+            <input type="checkbox" class="mw-checkbox" data-chk-key="vfxConnectedLayers" ${dbg.vfxConnectedLayers !== false ? 'checked' : ''} />
+          </label>
           <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
             <span>Auto-Fade Heavy FX</span>
             <input type="checkbox" class="mw-checkbox" data-chk-key="vfxCrowdAutoFade" ${dbg.vfxCrowdAutoFade !== false ? 'checked' : ''} />
@@ -1187,7 +1196,11 @@ export class WorkshopModal {
     this.windowEl.querySelectorAll('[data-chk-key]').forEach((chk) => {
       chk.addEventListener('change', (e) => {
         const key = chk.getAttribute('data-chk-key');
-        DebugConfig.update({ [key]: Boolean(e.target.checked) });
+        const isChecked = Boolean(e.target.checked);
+        DebugConfig.update({ [key]: isChecked });
+        this.windowEl.querySelectorAll(`[data-chk-key="${key}"]`).forEach((peer) => {
+          peer.checked = isChecked;
+        });
         AudioSys.play('click');
       });
     });

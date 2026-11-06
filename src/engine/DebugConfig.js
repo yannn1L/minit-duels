@@ -25,6 +25,7 @@ export const DEFAULT_DEBUG_STATE = {
 
   // Setting Tab — VFX & Combat Juice
   vfxQuality: 'auto', // 'auto' | 'high' | 'low'
+  vfxConnectedLayers: true,
   vfxParticleMult: 1.0,
   vfxOutlineAlpha: 0.75,
   vfxMiddleAlpha: 0.26,

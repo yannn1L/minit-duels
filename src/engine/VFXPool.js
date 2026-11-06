@@ -1,36 +1,51 @@
 // ============================================================
-// HIGH PERFORMANCE MULTI-LAYER CONNECTED VFX & COMBAT JUICE POOL
-// Separates FX into 3+ Coordinated Layers:
-//  1) Connected Outer Ring / Outline Layer (Under Fighters)
-//  2) Connected Middle Core / Fill Layer   (Under Fighters)
-//  3) Crisp Directional Particle Layer     (Over Fighters)
-// Overlapping rings, zones & scorch marks merge into unified
-// silhouettes without internal intersecting line clutter.
+// MODULAR MULTI-LAYER CONNECTED VFX & COMBAT JUICE POOL (ES Module)
+// Supports both:
+//  - Classic Sprite VFX Mode (for bespoke Minit textures like Absorb's singularity,
+//    or when Connected Layered FX is toggled OFF in Settings)
+//  - Smooth Connected 3-Layer VFX Mode (for Shockwaves, Scorch Craters, and
+//    opt-in Multi-Ring Zones like Schrodinger's Probability Clouds)
 // ============================================================
 import * as PIXI from 'pixi.js';
 import { CFG } from '../config.js';
 import { FastMath } from './FastMath.js';
 import { DebugConfig } from './DebugConfig.js';
 
-// Built-in & Minit custom ring/zone textures that should automatically
-// route into the under-fighter connected ring compositor instead of
-// covering fighters on the over-unit particle layer.
-const RING_ZONE_TEXTURES = {
-  fx_absorb_ring: { radius: 36, width: 2.5, color: 0xff4422, fillAlpha: 0.35 },
-  fx_absorb_core: { radius: 13, width: 2.0, color: 0xffaa00, fillAlpha: 0.65, isDarkCore: true },
-  fx_waves_aura_ring: { radius: 16, width: 2.0, color: 0x00e5ff, fillAlpha: 0.35 },
-  fx_saitama_pressure_ring: { radius: 28, width: 2.8, color: 0xff0033, fillAlpha: 0.38 },
-  fx_moth_wing_aura: { radius: 18, width: 2.0, color: 0x88ffcc, fillAlpha: 0.32 },
-  fx_pulsar_drone_halo: { radius: 11, width: 1.5, color: 0xff00aa, fillAlpha: 0.25 }
+// Opt-in ring/cloud textures that are designed to merge into connected 3-layer fields
+// when `vfxConnectedLayers` is enabled. (Note: Bespoke Minit art like `fx_absorb_ring`
+// and `fx_absorb_core` is intentionally NOT overridden here so Absorb keeps its
+// authentic singularity artwork!)
+const CONNECTED_RING_PRESETS = {
+  fx_schro_cloud_ring: {
+    radius: 30,
+    width: 2.2,
+    color: 0x00ffcc,
+    secondaryColor: 0xff00aa,
+    fillAlpha: 0.22,
+    dedupeDist: 28
+  }
 };
 
+// Stationary floor/containment textures that should render on the under-unit sprite layer
+// (`underParticleLayer`) so they never obscure Minit fighter sprites.
+const UNDER_UNIT_SPRITE_TEXTURES = new Set([
+  'fx_absorb_ring',
+  'fx_absorb_core',
+  'fx_waves_aura_ring',
+  'fx_pulsar_drone_halo',
+  'fx_moth_wing_aura',
+  'fx_saitama_pressure_ring',
+  'fx_schro_box',
+  'fx_schro_cloud_ring'
+]);
+
 /**
- * Computes the uncovered exterior angular intervals [startAngle, endAngle] for circle `i`
- * when overlapped by a list of other circles. Used to draw true boolean-union connected
- * outlines where overlapping rings/scorch marks fuse into one continuous outer perimeter.
+ * Computes uncovered exterior angular intervals [startAngle, endAngle] AND intersection
+ * junction points for circle `i` when overlapped by other circles.
+ * Ignores nearly faded-out circles (`norm <= 0.2`) so expiring rings never cause hard pops.
  */
-function computeExteriorArcs(circle, allCircles, selfIdx, radiusPad = 0) {
-  const r1 = circle.r + radiusPad;
+function computeSmoothExteriorArcs(circle, allCircles, selfIdx, junctionsOut = null) {
+  const r1 = circle.r;
   if (r1 <= 0.5) return [];
 
   const blocked = [];
@@ -38,15 +53,15 @@ function computeExteriorArcs(circle, allCircles, selfIdx, radiusPad = 0) {
   for (let j = 0; j < allCircles.length; j++) {
     if (j === selfIdx) continue;
     const other = allCircles[j];
-    const r2 = other.r + radiusPad;
-    if (r2 <= 0.5) continue;
+    const r2 = other.r;
+    if (r2 <= 0.5 || (other.renderNorm !== undefined && other.renderNorm <= 0.2)) continue;
 
     const dx = other.x - circle.x;
     const dy = other.y - circle.y;
     const dSq = dx * dx + dy * dy;
     const d = Math.sqrt(dSq);
 
-    // Identical center: keep only the larger circle (or lower index on tie)
+    // Nearly concentric circles: keep the larger circle's outer boundary
     if (d < 0.001) {
       if (r2 > r1 || (r2 === r1 && j < selfIdx)) {
         return [];
@@ -54,20 +69,20 @@ function computeExteriorArcs(circle, allCircles, selfIdx, radiusPad = 0) {
       continue;
     }
 
-    // Completely separated
+    // Disjoint circles
     if (d >= r1 + r2) continue;
 
-    // Circle i is completely inside circle j -> no exterior outline
+    // Circle i is completely enclosed inside circle j
     if (d + r1 <= r2) {
       return [];
     }
 
-    // Circle j is completely inside circle i -> circle i's outer boundary is unaffected
+    // Circle j is completely enclosed inside circle i
     if (d + r2 <= r1) {
       continue;
     }
 
-    // Partial intersection: find angular span on circle i covered by circle j
+    // Partial overlap: calculate angular span on circle i covered by circle j
     const cosHalf = FastMath.clamp((r1 * r1 + dSq - r2 * r2) / (2 * r1 * d), -1, 1);
     const halfSpan = Math.acos(cosHalf);
     if (halfSpan <= 0.002) continue;
@@ -75,17 +90,36 @@ function computeExteriorArcs(circle, allCircles, selfIdx, radiusPad = 0) {
     let mid = Math.atan2(dy, dx);
     if (mid < 0) mid += FastMath.TWO_PI;
 
-    let start = mid - halfSpan;
-    let end = mid + halfSpan;
+    const a1 = mid - halfSpan;
+    const a2 = mid + halfSpan;
 
-    if (start < 0) {
-      blocked.push([start + FastMath.TWO_PI, FastMath.TWO_PI]);
-      blocked.push([0, end]);
-    } else if (end > FastMath.TWO_PI) {
-      blocked.push([start, FastMath.TWO_PI]);
-      blocked.push([0, end - FastMath.TWO_PI]);
+    // Record intersection junction points once (for selfIdx < j) to draw smooth bridge fillets
+    if (junctionsOut && selfIdx < j) {
+      const jAlpha = Math.min(circle.renderNorm ?? 1, other.renderNorm ?? 1);
+      junctionsOut.push(
+        {
+          x: circle.x + Math.cos(a1) * r1,
+          y: circle.y + Math.sin(a1) * r1,
+          color: circle.color,
+          alpha: jAlpha
+        },
+        {
+          x: circle.x + Math.cos(a2) * r1,
+          y: circle.y + Math.sin(a2) * r1,
+          color: other.color,
+          alpha: jAlpha
+        }
+      );
+    }
+
+    if (a1 < 0) {
+      blocked.push([a1 + FastMath.TWO_PI, FastMath.TWO_PI]);
+      blocked.push([0, a2]);
+    } else if (a2 > FastMath.TWO_PI) {
+      blocked.push([a1, FastMath.TWO_PI]);
+      blocked.push([0, a2 - FastMath.TWO_PI]);
     } else {
-      blocked.push([start, end]);
+      blocked.push([a1, a2]);
     }
   }
 
@@ -93,20 +127,18 @@ function computeExteriorArcs(circle, allCircles, selfIdx, radiusPad = 0) {
     return [[0, FastMath.TWO_PI]];
   }
 
-  // Sort & merge blocked angular intervals
   blocked.sort((a, b) => a[0] - b[0]);
   const merged = [blocked[0]];
   for (let k = 1; k < blocked.length; k++) {
     const cur = blocked[k];
     const last = merged[merged.length - 1];
-    if (cur[0] <= last[1] + 0.005) {
+    if (cur[0] <= last[1] + 0.006) {
       if (cur[1] > last[1]) last[1] = cur[1];
     } else {
       merged.push(cur);
     }
   }
 
-  // Invert blocked intervals over [0, 2*PI] to obtain visible exterior arcs
   const visible = [];
   let cursor = 0;
   for (let k = 0; k < merged.length; k++) {
@@ -125,19 +157,20 @@ function computeExteriorArcs(circle, allCircles, selfIdx, radiusPad = 0) {
 
 export class VFXPool {
   constructor(cU, cO, texturesRef) {
-    this.cU = cU; // Under-unit container (scorch craters, connected ring middle & outlines, afterimages)
-    this.cO = cO; // Over-unit container (crisp directional sparks, projectiles, damage popups)
+    this.cU = cU; // Under-unit container (scorch marks, connected rings, under-unit sprites, afterimages)
+    this.cO = cO; // Over-unit container (crisp hit sparks, projectiles, damage popups)
     this.textures = texturesRef;
     this.rollingFps = 60;
+    this.customRingPresets = { ...CONNECTED_RING_PRESETS };
 
     // ============================================================
     // UNDER-FIGHTER LAYER HIERARCHY (Never covers Minit fighters)
     // ============================================================
-    // 1. Connected Floor Scorch Layer (merged craters + outer char rim)
+    // 1. Connected Floor Scorch Vector Layer (when Connected Layers ON)
     this.scorchGfx = new PIXI.Graphics();
     this.cU.addChild(this.scorchGfx);
 
-    // 2. Under-Unit Afterimage Ghosts & Decals
+    // 2. Under-Unit Decals & Afterimage Ghosts (also hosts classic scorch sprites when Connected Layers OFF)
     this.decalLayer = new PIXI.Container();
     this.cU.addChild(this.decalLayer);
 
@@ -145,31 +178,31 @@ export class VFXPool {
     this.ringMiddleGfx = new PIXI.Graphics();
     this.cU.addChild(this.ringMiddleGfx);
 
-    // 4. Connected Ring / Zone Layer — PART 1: Unified Outer Perimeter Outline
+    // 4. Connected Ring / Zone Layer — PART 1: Smooth Feathered Outer Perimeter Outline
     this.ringOutlineGfx = new PIXI.Graphics();
     this.cU.addChild(this.ringOutlineGfx);
 
-    // 5. Under-Unit Ambient Particles
+    // 5. Classic Sprite Shockwave Layer (placed under fighters so even classic mode never blinds combat)
+    this.shockwaveLayer = new PIXI.Container();
+    this.cU.addChild(this.shockwaveLayer);
+
+    // 6. Under-Unit Bespoke Sprites (e.g., Absorb Singularity Core/Ring, Schrodinger Box, Auras)
     this.underParticleLayer = new PIXI.Container();
     this.cU.addChild(this.underParticleLayer);
 
     // ============================================================
     // OVER-FIGHTER LAYER HIERARCHY (Crisp accents & combat popups)
     // ============================================================
-    // 6. Connected Ring / Combat Layer — PART 3: Crisp Particles & Projectiles
+    // 7. Connected Ring / Combat Layer — PART 3: Crisp Particles & Projectiles
     this.overParticleLayer = new PIXI.Container();
     this.cO.addChild(this.overParticleLayer);
-
-    // 7. Legacy sprite shockwave fallback container (kept empty for API compatibility)
-    this.shockwaveLayer = new PIXI.Container();
-    this.cO.addChild(this.shockwaveLayer);
 
     // 8. Floating Damage / Crit / Heal Popups
     this.textLayer = new PIXI.Container();
     this.cO.addChild(this.textLayer);
 
-    this.pool = { phys: [], sws: [], txts: [], decals: [], scorches: [] };
-    this.act = { phys: [], sws: [], txts: [], decals: [], scorches: [] };
+    this.pool = { phys: [], sws: [], swSprites: [], txts: [], decals: [], scorches: [] };
+    this.act = { phys: [], sws: [], swSprites: [], txts: [], decals: [], scorches: [] };
 
     // 1. Physics & Spark Sprites Pool
     const physLimit = CFG.VFX.PHYSICS_LIMIT || 600;
@@ -177,11 +210,12 @@ export class VFXPool {
       const s = new PIXI.Sprite();
       s.visible = false;
       s.anchor.set(0.5);
+      s.currentLayer = 'over';
       this.overParticleLayer.addChild(s);
       this.pool.phys.push(s);
     }
 
-    // 2. Under-Unit Afterimage Ghosts Pool
+    // 2. Under-Unit Afterimage Ghosts & Classic Scorch Decals Pool
     const decalLimit = CFG.VFX.DECAL_LIMIT || 140;
     for (let i = 0; i < decalLimit; i++) {
       const d = new PIXI.Sprite();
@@ -191,38 +225,55 @@ export class VFXPool {
       this.pool.decals.push(d);
     }
 
-    // 3. Connected Ring / Zone State Pool (rendered via ringOutlineGfx + ringMiddleGfx)
-    const swLimit = (CFG.VFX.SHOCKWAVE_LIMIT || 36) + 16;
+    // 3A. Connected Ring / Zone State Pool (used when vfxConnectedLayers === true)
+    const swLimit = (CFG.VFX.SHOCKWAVE_LIMIT || 36) + 20;
     for (let i = 0; i < swLimit; i++) {
       this.pool.sws.push({
         x: 0,
         y: 0,
+        targetX: 0,
+        targetY: 0,
         r: 4,
         mR: 40,
         width: 3,
         color: 0x00e5ff,
-        fillAlpha: 0.28,
-        ease: 0.22,
+        secondaryColor: 0xffffff,
+        fillAlpha: 0.26,
+        ease: 0.24,
         life: 0,
         maxL: 20,
+        age: 0,
         isZone: false,
-        isDarkCore: false
+        isDarkCore: false,
+        renderNorm: 1
       });
     }
 
-    // 4. Connected Scorch Crater State Pool (rendered via scorchGfx)
+    // 3B. Classic Sprite Shockwaves Pool (used when vfxConnectedLayers === false)
+    for (let i = 0; i < 36; i++) {
+      const swSpr = new PIXI.Sprite();
+      swSpr.anchor.set(0.5);
+      swSpr.visible = false;
+      swSpr.blendMode = PIXI.BLEND_MODES.ADD;
+      this.shockwaveLayer.addChild(swSpr);
+      this.pool.swSprites.push(swSpr);
+    }
+
+    // 4. Connected Scorch Crater State Pool (used when vfxConnectedLayers === true)
     for (let i = 0; i < 32; i++) {
       this.pool.scorches.push({
         x: 0,
         y: 0,
         r: 14,
+        targetR: 14,
         color: 0x00e5ff,
         life: 0,
-        maxL: 200
+        maxL: 200,
+        renderNorm: 1
       });
     }
 
-    // 5. Damage / Critical / Heal Text Containers Pool (7 glyphs: sign + up to 5 digits + '!')
+    // 5. Damage / Critical / Heal Text Containers Pool (7 glyphs)
     const textLimit = CFG.VFX.TEXT_LIMIT || 48;
     for (let i = 0; i < textLimit; i++) {
       const ct = new PIXI.Container();
@@ -239,13 +290,29 @@ export class VFXPool {
   }
 
   initTex() {
-    // Textures are ready; connected rings use vector arc union + middle core compositing
+    const ringTex = this.textures['fx_ring'];
+    if (ringTex) {
+      this.pool.swSprites.forEach((sw) => {
+        sw.texture = ringTex;
+      });
+    }
   }
 
   /**
-   * Computes current particle emission budget multiplier (0.2 to 2.5)
-   * based on user's VFX Quality setting ('auto' | 'high' | 'low'), slider, and live FPS.
+   * Allows any custom Minit to register a texture key to use the Connected 3-Layer Ring system.
    */
+  registerConnectedRingTexture(texKey, presetConfig = {}) {
+    if (!texKey) return;
+    this.customRingPresets[texKey] = {
+      radius: presetConfig.radius ?? 28,
+      width: presetConfig.width ?? 2.2,
+      color: presetConfig.color ?? 0x00e5ff,
+      secondaryColor: presetConfig.secondaryColor ?? 0xffffff,
+      fillAlpha: presetConfig.fillAlpha ?? 0.24,
+      dedupeDist: presetConfig.dedupeDist ?? 24
+    };
+  }
+
   getBudgetMult() {
     const mode = DebugConfig.state.vfxQuality || 'auto';
     const userMult = DebugConfig.state.vfxParticleMult ?? 1.0;
@@ -263,9 +330,6 @@ export class VFXPool {
     return mult * userMult;
   }
 
-  /**
-   * Computes anti-clutter crowd damping multiplier (0.35 to 1.0) when many rings/scorches overlap.
-   */
   getCrowdDamping(activeCount, threshold = 4, maxCount = 16) {
     if (DebugConfig.state.vfxCrowdAutoFade === false) return 1.0;
     if (activeCount <= threshold) return 1.0;
@@ -274,7 +338,9 @@ export class VFXPool {
   }
 
   /**
-   * Spawns a versatile physics particle (or routes ring/zone textures to the under-unit connected ring layer).
+   * Spawns a physics sprite or routes opt-in ring presets to the Connected 3-Layer Ring compositor.
+   * Bespoke Minit textures (such as Absorb's `fx_absorb_core` and `fx_absorb_ring`) are preserved
+   * as authentic sprites on the under-unit layer unless explicitly opted into `connectedRing`.
    */
   spawnPhysics(
     texKey,
@@ -290,15 +356,31 @@ export class VFXPool {
     baseAlpha = 1.0,
     extra = null
   ) {
-    // Automatically intercept persistent zone/aura rings so they render on the under-unit connected ring layer
-    const ringPreset = RING_ZONE_TEXTURES[texKey];
-    if (ringPreset && vx === 0 && vy === 0) {
-      const col = tint !== 0xffffff ? tint : ringPreset.color;
-      this.spawnZoneRing(x, y, ringPreset.radius, col, {
-        width: ringPreset.width,
-        life: Math.max(2, life),
-        fillAlpha: ringPreset.fillAlpha * baseAlpha,
-        isDarkCore: ringPreset.isDarkCore
+    const useConnected = DebugConfig.state.vfxConnectedLayers !== false;
+    const optInPreset =
+      extra?.connectedRing === false
+        ? null
+        : extra?.connectedRing
+          ? {
+              radius: extra.radius ?? 28,
+              width: extra.width ?? 2.2,
+              color: tint !== 0xffffff ? tint : (extra.color ?? 0x00e5ff),
+              secondaryColor: extra.secondaryColor ?? 0xffffff,
+              fillAlpha: extra.fillAlpha ?? 0.24,
+              dedupeDist: extra.dedupeDist ?? 24
+            }
+          : this.customRingPresets[texKey];
+
+    // Route opt-in multi-ring clouds (like Schrodinger's `fx_schro_cloud_ring`) to the Connected Ring Layer
+    // when Connected Layered FX is enabled in Settings!
+    if (useConnected && optInPreset && vx === 0 && vy === 0) {
+      const col = tint !== 0xffffff ? tint : optInPreset.color;
+      this.spawnZoneRing(x, y, optInPreset.radius * (extra?.scale ?? 1.0), col, {
+        width: optInPreset.width,
+        secondaryColor: optInPreset.secondaryColor,
+        life: Math.max(3, life + 1),
+        fillAlpha: optInPreset.fillAlpha * baseAlpha,
+        dedupeDist: optInPreset.dedupeDist
       });
       return null;
     }
@@ -313,7 +395,47 @@ export class VFXPool {
     const tex = this.textures[texKey] || this.textures['fx_spark'] || this.textures['fx_dust'];
     if (!tex) return null;
 
+    // Place stationary floor/aura/containment sprites (like Absorb's vortex or Schrodinger's box)
+    // on `underParticleLayer` so they never cover Minit fighter sprites.
+    const placeUnder =
+      extra?.underUnit !== undefined
+        ? Boolean(extra.underUnit)
+        : vx === 0 && vy === 0 && UNDER_UNIT_SPRITE_TEXTURES.has(texKey);
+
+    // Deduplicate stationary per-frame sprites (e.g., when a trait spawns a `life: 2` sprite every frame
+    // at the same spot) so they don't double-stack alpha or flicker!
+    if (placeUnder && vx === 0 && vy === 0 && life <= 4) {
+      for (let i = this.act.phys.length - 1; i >= 0; i--) {
+        const activeSpr = this.act.phys[i];
+        if (
+          activeSpr.texKey === texKey &&
+          Math.abs(activeSpr.x - x) < 18 &&
+          Math.abs(activeSpr.y - y) < 18
+        ) {
+          activeSpr.x = FastMath.lerp(activeSpr.x, x, 0.45);
+          activeSpr.y = FastMath.lerp(activeSpr.y, y, 0.45);
+          activeSpr.life = Math.max(activeSpr.life, life);
+          activeSpr.maxL = Math.max(activeSpr.maxL, life);
+          activeSpr.tint = tint;
+          if (extra?.scale !== undefined) activeSpr.scale.set(extra.scale);
+          if (extra?.rotation !== undefined) activeSpr.rotation = extra.rotation;
+          return activeSpr;
+        }
+      }
+    }
+
     const s = this.pool.phys.pop();
+    const targetLayerName = placeUnder ? 'under' : 'over';
+    if (s.currentLayer !== targetLayerName) {
+      s.currentLayer = targetLayerName;
+      if (placeUnder) {
+        this.underParticleLayer.addChild(s);
+      } else {
+        this.overParticleLayer.addChild(s);
+      }
+    }
+
+    s.texKey = texKey;
     s.texture = tex;
     s.x = x;
     s.y = y;
@@ -325,9 +447,9 @@ export class VFXPool {
     s.dragY = dragY;
     s.sD = scaleDown;
     s.tint = tint;
-    s.baseAlpha = baseAlpha;
+    s.baseAlpha = placeUnder && texKey === 'fx_schro_cloud_ring' ? Math.min(0.38, baseAlpha) : baseAlpha;
     s.visible = true;
-    s.alpha = baseAlpha;
+    s.alpha = s.baseAlpha;
 
     const isLightTex =
       texKey === 'fx_spark' ||
@@ -335,7 +457,12 @@ export class VFXPool {
       texKey === 'fx_ember' ||
       texKey === 'fx_star';
 
-    const useAdditive = extra?.additive !== undefined ? extra.additive : isLightTex;
+    const useAdditive =
+      placeUnder && (texKey === 'fx_schro_box' || texKey === 'fx_schro_cloud_ring')
+        ? false
+        : extra?.additive !== undefined
+          ? extra.additive
+          : isLightTex;
     s.blendMode = useAdditive ? PIXI.BLEND_MODES.ADD : PIXI.BLEND_MODES.NORMAL;
 
     const speed = Math.hypot(vx, vy);
@@ -343,9 +470,13 @@ export class VFXPool {
       extra?.alignToVel !== undefined ? extra.alignToVel : texKey === 'fx_spark' && speed > 0.35;
     s.stretchFactor = extra?.stretchFactor ?? (texKey === 'fx_spark' ? 0.32 : 0);
     s.baseScale = extra?.scale ?? 1.0;
-    s.grav = extra?.grav !== undefined ? extra.grav : texKey === 'fx_glow' ? 0 : 0.22;
+    s.grav = extra?.grav !== undefined ? extra.grav : texKey === 'fx_glow' || placeUnder ? 0 : 0.22;
     s.vRot =
-      extra?.vRot !== undefined ? extra.vRot : s.alignToVel ? 0 : FastMath.randRange(-0.14, 0.14);
+      extra?.vRot !== undefined
+        ? extra.vRot
+        : s.alignToVel || placeUnder
+          ? 0
+          : FastMath.randRange(-0.14, 0.14);
 
     if (s.alignToVel) {
       s.rotation = Math.atan2(vy, vx);
@@ -411,9 +542,6 @@ export class VFXPool {
     }
   }
 
-  /**
-   * Spawns a soft additive radial bloom flare at (x, y).
-   */
   spawnGlow(x, y, color = 0x00e5ff, scale = 1.0, life = 14, alpha = 0.55) {
     return this.spawnPhysics('fx_glow', x, y, 0, 0, life, 1, 1, true, color, alpha, {
       additive: true,
@@ -424,9 +552,6 @@ export class VFXPool {
     });
   }
 
-  /**
-   * Spawns a ghost afterimage trail for dashing fighters on the under-unit layer.
-   */
   spawnAfterimage(
     textureOrKey,
     x,
@@ -467,22 +592,48 @@ export class VFXPool {
   }
 
   /**
-   * Stamps a connected floor scorch crater under units.
-   * Nearby scorches automatically fuse into a single connected crater instead of stacking!
+   * Stamps a floor scorch mark under units.
+   * - When `vfxConnectedLayers` is ON: merges nearby scorches into smooth connected craters.
+   * - When `vfxConnectedLayers` is OFF: stamps classic `fx_scorch` decal sprites.
    */
   spawnScorch(x, y, color = 0x00e5ff, scale = 1.1, life = 200) {
     if (DebugConfig.state.vfxShowScorch === false) return null;
 
+    // Classic sprite scorch mode when Connected Layered FX is toggled OFF
+    if (DebugConfig.state.vfxConnectedLayers === false) {
+      if (this.pool.decals.length === 0) return null;
+      const tex = this.textures['fx_scorch'];
+      if (!tex) return null;
+      const d = this.pool.decals.pop();
+      d.texture = tex;
+      d.x = x;
+      d.y = y;
+      d.scale.set(scale);
+      d.rotation = FastMath.rand() * 6.28;
+      d.tint = color;
+      d.baseAlpha = 0.55 * (DebugConfig.state.vfxScorchAlpha ?? 0.45);
+      d.alpha = d.baseAlpha;
+      d.life = life;
+      d.maxL = Math.max(1, life);
+      d.shrink = false;
+      d.startScaleX = scale;
+      d.startScaleY = scale;
+      d.blendMode = PIXI.BLEND_MODES.NORMAL;
+      d.visible = true;
+      this.act.decals.push(d);
+      return d;
+    }
+
     const targetR = FastMath.clamp(scale * 16, 8, 34);
 
-    // Spatial Merge: if a scorch crater already exists nearby, fuse into it instead of piling up
+    // Spatial Merge: if a scorch crater already exists nearby, smoothly fuse into it
     for (let i = 0; i < this.act.scorches.length; i++) {
       const ex = this.act.scorches[i];
       const dSq = FastMath.distSq(x, y, ex.x, ex.y);
-      if (dSq < 20 * 20) {
-        ex.x = ex.x * 0.65 + x * 0.35;
-        ex.y = ex.y * 0.65 + y * 0.35;
-        ex.r = Math.min(36, Math.max(ex.r, targetR) + 2.2);
+      if (dSq < 22 * 22) {
+        ex.x = ex.x * 0.7 + x * 0.3;
+        ex.y = ex.y * 0.7 + y * 0.3;
+        ex.targetR = Math.min(36, Math.max(ex.targetR, targetR) + 2.0);
         ex.color = color;
         ex.life = Math.max(ex.life, life);
         ex.maxL = Math.max(ex.maxL, life);
@@ -490,7 +641,6 @@ export class VFXPool {
       }
     }
 
-    // Recycle oldest scorch if pool is full
     let sc;
     if (this.pool.scorches.length > 0) {
       sc = this.pool.scorches.pop();
@@ -502,34 +652,44 @@ export class VFXPool {
 
     sc.x = x;
     sc.y = y;
-    sc.r = targetR;
+    sc.r = targetR * 0.55;
+    sc.targetR = targetR;
     sc.color = color;
     sc.life = life;
     sc.maxL = Math.max(1, life);
+    sc.renderNorm = 1;
     this.act.scorches.push(sc);
     return sc;
   }
 
   /**
-   * Spawns a persistent or frame-refreshed zone ring (e.g. Absorb vortex, Waves aura, Saitama pressure ring)
+   * Spawns or updates a smooth connected zone ring (e.g. Schrodinger's Probability Cloud or custom zone)
    * on the under-fighter Connected Ring Layer (Outline + Middle Fill).
    */
-  spawnZoneRing(x, y, radius = 32, color = 0x00e5ff, options = null) {
-    // Check if an active zone ring already exists at nearly the same spot & radius to update in-place
+  spawnZoneRing(x, y, radius = 30, color = 0x00e5ff, options = null) {
+    // If Connected Layered FX is toggled OFF, render using a single clean under-unit ring sprite
+    if (DebugConfig.state.vfxConnectedLayers === false) {
+      return this.spawnPhysics('fx_ring', x, y, 0, 0, options?.life ?? 3, 1, 1, false, color, 0.42, {
+        underUnit: true,
+        additive: false,
+        scale: radius / 60,
+        forceSpawn: true
+      });
+    }
+
+    const dedupeDist = options?.dedupeDist ?? 26;
+    const dedupeSq = dedupeDist * dedupeDist;
+
+    // Smoothly merge/update in-place if an active zone ring already exists nearby
     for (let i = 0; i < this.act.sws.length; i++) {
       const ex = this.act.sws[i];
-      if (
-        ex.isZone &&
-        Math.abs(ex.x - x) < 6 &&
-        Math.abs(ex.y - y) < 6 &&
-        Math.abs(ex.mR - radius) < 6
-      ) {
-        ex.x = x;
-        ex.y = y;
-        ex.r = radius;
-        ex.mR = radius;
+      if (ex.isZone && FastMath.distSq(x, y, ex.targetX, ex.targetY) <= dedupeSq) {
+        ex.targetX = FastMath.lerp(ex.targetX, x, 0.35);
+        ex.targetY = FastMath.lerp(ex.targetY, y, 0.35);
+        ex.mR = Math.min(46, Math.max(ex.mR, radius));
         ex.color = color;
-        ex.life = options?.life ?? 3;
+        if (options?.secondaryColor !== undefined) ex.secondaryColor = options.secondaryColor;
+        ex.life = Math.max(ex.life, options?.life ?? 4);
         ex.maxL = Math.max(ex.maxL, ex.life);
         return ex;
       }
@@ -539,38 +699,65 @@ export class VFXPool {
     const sw = this.pool.sws.pop();
     sw.x = x;
     sw.y = y;
-    sw.r = radius;
+    sw.targetX = x;
+    sw.targetY = y;
+    sw.r = radius * 0.78;
     sw.mR = radius;
     sw.width = options?.width ?? 2.2;
     sw.color = color;
-    sw.fillAlpha = options?.fillAlpha ?? 0.3;
-    sw.ease = 1.0;
-    sw.life = options?.life ?? 3;
+    sw.secondaryColor = options?.secondaryColor ?? 0xffffff;
+    sw.fillAlpha = options?.fillAlpha ?? 0.24;
+    sw.ease = 0.25;
+    sw.life = options?.life ?? 4;
     sw.maxL = Math.max(1, sw.life);
+    sw.age = 0;
     sw.isZone = true;
     sw.isDarkCore = Boolean(options?.isDarkCore);
+    sw.renderNorm = 1;
     this.act.sws.push(sw);
     return sw;
   }
 
   /**
-   * Spawns a 3-Layer Connected Shockwave:
-   *  - Layer 1 (Under Fighters): Connected Outer Perimeter Ring that merges with nearby rings
-   *  - Layer 2 (Under Fighters): Soft Middle Core Fill that bridges overlapping rings without stacking opacity
-   *  - Layer 3 (Over Fighters):  Crisp perimeter accent sparks that connect the ring to the particle layer
+   * Spawns a Shockwave Ring:
+   * - When `vfxConnectedLayers` is ON: uses the smooth 3-Layer Connected Ring Compositor
+   *   (Feathered Outer Outline + Non-Stacking Middle Core + Rim Sparks).
+   * - When `vfxConnectedLayers` is OFF: uses classic sprite shockwaves (`this.shockwaveLayer`).
    */
   spawnShockwave(x, y, color = 0x00e5ff, maxRadius = 80, width = 4, isSecondary = false) {
-    // Merge or skip if an almost identical shockwave was just spawned at the exact same spot this tick
+    // Classic Sprite Shockwave Mode when Connected Layered FX is OFF
+    if (DebugConfig.state.vfxConnectedLayers === false) {
+      if (this.pool.swSprites.length === 0) return;
+      const sw = this.pool.swSprites.pop();
+      sw.texture =
+        isSecondary && this.textures['fx_ring_thin']
+          ? this.textures['fx_ring_thin']
+          : this.textures['fx_ring'] || sw.texture;
+      sw.x = x;
+      sw.y = y;
+      sw.tint = color;
+      sw.r = isSecondary ? 0.05 : 0.1;
+      sw.mR = maxRadius / 60;
+      sw.ease = isSecondary ? 0.28 : 0.2;
+      sw.life = isSecondary ? 15 : 21;
+      sw.maxL = sw.life;
+      sw.visible = true;
+      sw.alpha = (isSecondary ? 0.65 : 0.85) * (DebugConfig.state.vfxOutlineAlpha ?? 0.75);
+      sw.scale.set(sw.r);
+      this.act.swSprites.push(sw);
+      return;
+    }
+
+    // Deduplicate near-simultaneous shockwaves spawned at the same spot so multi-shockwave calls
+    // combine into a single dual-toned connected ring instead of cluttering the screen
     for (let i = 0; i < this.act.sws.length; i++) {
       const ex = this.act.sws[i];
-      if (
-        !ex.isZone &&
-        ex.maxL - ex.life <= 2 &&
-        FastMath.distSq(x, y, ex.x, ex.y) < 100 &&
-        Math.abs(ex.mR - maxRadius) < 18
-      ) {
+      if (!ex.isZone && ex.age <= 2 && FastMath.distSq(x, y, ex.x, ex.y) < 196) {
         ex.mR = Math.max(ex.mR, maxRadius);
         ex.width = Math.max(ex.width, width);
+        if (color !== ex.color) {
+          ex.secondaryColor = color;
+        }
         return;
       }
     }
@@ -586,25 +773,30 @@ export class VFXPool {
 
     sw.x = x;
     sw.y = y;
+    sw.targetX = x;
+    sw.targetY = y;
     sw.color = color;
-    sw.r = isSecondary ? Math.max(4, maxRadius * 0.12) : Math.max(6, maxRadius * 0.18);
+    sw.secondaryColor = 0xffffff;
+    sw.r = isSecondary ? Math.max(4, maxRadius * 0.12) : Math.max(6, maxRadius * 0.16);
     sw.mR = Math.max(10, maxRadius);
-    sw.width = FastMath.clamp(width, 1.5, 6);
-    sw.fillAlpha = isSecondary ? 0.15 : 0.32;
-    sw.ease = isSecondary ? 0.28 : 0.22;
-    sw.life = isSecondary ? 15 : 21;
+    sw.width = FastMath.clamp(width, 1.5, 5.5);
+    sw.fillAlpha = isSecondary ? 0.14 : 0.28;
+    sw.ease = isSecondary ? 0.26 : 0.2;
+    sw.life = isSecondary ? 16 : 22;
     sw.maxL = sw.life;
+    sw.age = 0;
     sw.isZone = false;
     sw.isDarkCore = false;
+    sw.renderNorm = 1;
     this.act.sws.push(sw);
 
-    // Layer 3 Connection: Emit a few crisp tangential/radial rim sparks so the ring connects with the particle layer
-    if (!isSecondary && maxRadius >= 38 && (DebugConfig.state.vfxQuality || 'auto') !== 'low') {
-      const sparkCount = maxRadius >= 90 ? 4 : 2;
+    // Layer 3 Connection: Emit crisp tangential/radial rim sparks so the ring connects to the particle layer
+    if (!isSecondary && maxRadius >= 42 && (DebugConfig.state.vfxQuality || 'auto') !== 'low') {
+      const sparkCount = maxRadius >= 95 ? 4 : 2;
       for (let i = 0; i < sparkCount; i++) {
         const ang = FastMath.randRange(0, FastMath.TWO_PI);
         const rimR = sw.r;
-        const spd = FastMath.randRange(1.8, 3.8);
+        const spd = FastMath.randRange(1.8, 3.6);
         this.spawnPhysics(
           'fx_spark',
           x + Math.cos(ang) * rimR,
@@ -616,16 +808,13 @@ export class VFXPool {
           0.88,
           true,
           i === 0 ? 0xffffff : color,
-          0.85,
-          { additive: true, alignToVel: true, stretchFactor: 0.3, scale: 0.8 }
+          0.82,
+          { additive: true, alignToVel: true, stretchFactor: 0.3, scale: 0.78 }
         );
       }
     }
   }
 
-  /**
-   * Spawns floating damage, critical hit ('!'), or heal ('+') popup numbers with bounce physics.
-   */
   spawnDmgText(x, y, dmg, color = 0xff0000, scale = 1.0, options = null) {
     if (DebugConfig.state.vfxShowDmgText === false) return;
     if (this.pool.txts.length === 0) return;
@@ -701,9 +890,8 @@ export class VFXPool {
       this.rollingFps = this.rollingFps * 0.92 + currentFps * 0.08;
     }
 
-    // Apply live per-layer opacity sliders from DebugConfig
     const dbg = DebugConfig.state;
-    const swCrowd = this.getCrowdDamping(this.act.sws.length, 4, 15);
+    const swCrowd = this.getCrowdDamping(this.act.sws.length + this.act.swSprites.length, 4, 15);
     const scorchCrowd = this.getCrowdDamping(this.act.scorches.length, 4, 14);
 
     this.ringOutlineGfx.alpha = (dbg.vfxOutlineAlpha ?? 0.75) * swCrowd;
@@ -715,6 +903,7 @@ export class VFXPool {
     this._updateDecals(tS);
     this._updateScorches(tS);
     this._updateConnectedRings(tS);
+    this._updateClassicShockwaveSprites(tS);
     this._updateDamageTexts(tS);
   }
 
@@ -783,14 +972,37 @@ export class VFXPool {
     }
   }
 
+  _updateClassicShockwaveSprites(tS) {
+    for (let i = this.act.swSprites.length - 1; i >= 0; i--) {
+      const s = this.act.swSprites[i];
+      s.life -= tS;
+      if (s.life <= 0) {
+        s.visible = false;
+        this.act.swSprites[i] = this.act.swSprites[this.act.swSprites.length - 1];
+        this.act.swSprites.pop();
+        this.pool.swSprites.push(s);
+        continue;
+      }
+      const ease = s.ease || 0.22;
+      s.r += (s.mR - s.r) * ease * tS;
+      s.scale.set(s.r);
+      s.alpha =
+        Math.pow(Math.max(0, s.life / s.maxL), 0.85) * (DebugConfig.state.vfxOutlineAlpha ?? 0.75);
+    }
+  }
+
   /**
-   * Renders Connected Floor Scorch Craters (`this.scorchGfx`).
-   * Overlapping scorches fuse their outer char outlines into a single silhouette
-   * and share a subtle dark-tinted crater interior.
+   * Renders Smooth Connected Floor Scorch Craters (`this.scorchGfx`).
    */
   _updateScorches(tS) {
     this.scorchGfx.clear();
-    if (DebugConfig.state.vfxShowScorch === false || this.act.scorches.length === 0) return;
+    if (
+      DebugConfig.state.vfxShowScorch === false ||
+      DebugConfig.state.vfxConnectedLayers === false ||
+      this.act.scorches.length === 0
+    ) {
+      return;
+    }
 
     const crowdDecayBoost =
       DebugConfig.state.vfxCrowdAutoFade !== false && this.act.scorches.length > 6
@@ -804,37 +1016,44 @@ export class VFXPool {
         this.act.scorches[i] = this.act.scorches[this.act.scorches.length - 1];
         this.act.scorches.pop();
         this.pool.scorches.push(sc);
+        continue;
       }
+      sc.r += ((sc.targetR || sc.r) - sc.r) * 0.22 * tS;
+      sc.renderNorm = Math.min(1, sc.life / (sc.maxL * 0.35));
     }
 
     const list = this.act.scorches;
     if (list.length === 0) return;
 
-    // Pass 1: Subtle dark crater interior fill (non-stacking because scorchGfx container alpha is capped)
+    // Pass 1: Soft dark crater interior fill
     for (let i = 0; i < list.length; i++) {
       const sc = list[i];
-      const norm = Math.min(1, sc.life / (sc.maxL * 0.35));
       this.scorchGfx
         .lineStyle(0)
-        .beginFill(0x06060c, 0.55 * norm)
-        .drawCircle(sc.x, sc.y, Math.max(2, sc.r - 1.5))
+        .beginFill(0x06060c, 0.52 * sc.renderNorm)
+        .drawCircle(sc.x, sc.y, Math.max(2, sc.r - 1.2))
         .endFill();
     }
 
-    // Pass 2: Connected exterior char rim + colored ember ring only on the outer union boundary
+    // Pass 2: Feathered connected exterior char rim
     for (let i = 0; i < list.length; i++) {
       const sc = list[i];
-      const norm = Math.min(1, sc.life / (sc.maxL * 0.4));
-      const arcs = computeExteriorArcs(sc, list, i, 0);
+      const norm = sc.renderNorm;
+      const arcs = computeSmoothExteriorArcs(sc, list, i, null);
       for (let a = 0; a < arcs.length; a++) {
         const [startAng, endAng] = arcs[a];
         if (endAng - startAng >= FastMath.TWO_PI - 0.02) {
-          this.scorchGfx.lineStyle(1.6, sc.color, 0.55 * norm).drawCircle(sc.x, sc.y, sc.r);
+          this.scorchGfx.lineStyle(3.2, sc.color, 0.16 * norm).drawCircle(sc.x, sc.y, sc.r);
+          this.scorchGfx.lineStyle(1.4, sc.color, 0.55 * norm).drawCircle(sc.x, sc.y, sc.r);
         } else {
           const sx = sc.x + Math.cos(startAng) * sc.r;
           const sy = sc.y + Math.sin(startAng) * sc.r;
           this.scorchGfx
-            .lineStyle(1.6, sc.color, 0.55 * norm)
+            .lineStyle(3.2, sc.color, 0.16 * norm)
+            .moveTo(sx, sy)
+            .arc(sc.x, sc.y, sc.r, startAng, endAng);
+          this.scorchGfx
+            .lineStyle(1.4, sc.color, 0.55 * norm)
             .moveTo(sx, sy)
             .arc(sc.x, sc.y, sc.r, startAng, endAng);
         }
@@ -843,18 +1062,19 @@ export class VFXPool {
   }
 
   /**
-   * Renders Connected Multi-Layer Rings & Area Zones (`ringOutlineGfx` + `ringMiddleGfx`).
-   *  - Layer 1 (`ringOutlineGfx`): True boolean-union exterior perimeter arcs so overlapping rings
-   *    connect into one continuous shape without internal intersecting lines.
-   *  - Layer 2 (`ringMiddleGfx`): Soft translucent middle fill + center core node underneath fighters.
+   * Renders Smooth Connected Multi-Layer Rings & Area Zones (`ringOutlineGfx` + `ringMiddleGfx`).
+   * Features:
+   *  - Smooth 60Hz position & radius interpolation
+   *  - 3-pass feathered exterior outline stroke (outer glow halo + main rim + inner core highlight)
+   *  - Smooth intersection junction fillets where two overlapping rings meet
+   *  - Translucent non-stacking middle fill underneath fighters
    */
   _updateConnectedRings(tS) {
     this.ringOutlineGfx.clear();
     this.ringMiddleGfx.clear();
 
-    if (this.act.sws.length === 0) return;
+    if (DebugConfig.state.vfxConnectedLayers === false || this.act.sws.length === 0) return;
 
-    // Accelerate decay on older shockwaves when many rings overlap
     const crowdAccel =
       DebugConfig.state.vfxCrowdAutoFade !== false && this.act.sws.length > 6
         ? 1.0 + (this.act.sws.length - 6) * 0.22
@@ -862,6 +1082,7 @@ export class VFXPool {
 
     for (let i = this.act.sws.length - 1; i >= 0; i--) {
       const s = this.act.sws[i];
+      s.age = (s.age || 0) + tS;
       s.life -= s.isZone ? tS : tS * crowdAccel;
       if (s.life <= 0) {
         this.act.sws[i] = this.act.sws[this.act.sws.length - 1];
@@ -869,87 +1090,127 @@ export class VFXPool {
         this.pool.sws.push(s);
         continue;
       }
-      if (!s.isZone) {
-        const ease = s.ease || 0.22;
-        s.r += (s.mR - s.r) * ease * tS;
-      }
+
+      // Smoothly interpolate position & radius for butter-smooth expansion and zone tracking
+      s.x += ((s.targetX ?? s.x) - s.x) * 0.35 * tS;
+      s.y += ((s.targetY ?? s.y) - s.y) * 0.35 * tS;
+      const ease = s.ease || 0.22;
+      s.r += (s.mR - s.r) * ease * tS;
+
+      const fadeOut = Math.pow(Math.max(0, s.life / s.maxL), 0.75);
+      const fadeIn = Math.min(1.0, (s.age || 1) / 2.5);
+      s.renderNorm = (s.isZone ? Math.min(1.0, s.life / 2.5) * 0.9 : fadeOut) * fadeIn;
     }
 
     const rings = this.act.sws;
     if (rings.length === 0) return;
 
-    const bgCol = CFG.ARENA?.BG_COLOR ?? 0x12121e;
-
     // ------------------------------------------------------------
-    // LAYER 2: MIDDLE PART / CORE FILL (`ringMiddleGfx`)
-    // Pass 2A: Erase/unify overlapping interior seams with arena floor base
-    // Pass 2B: Draw soft translucent colored middle fill + center pulse node
+    // LAYER 2: SMOOTH MIDDLE PART / CORE FILL (`ringMiddleGfx`)
     // ------------------------------------------------------------
     for (let i = 0; i < rings.length; i++) {
       const s = rings[i];
-      const norm = s.isZone ? 0.85 : Math.pow(Math.max(0, s.life / s.maxL), 0.8);
-      const innerR = Math.max(2, s.r - s.width * 0.5);
+      const norm = s.renderNorm;
+      const innerR = Math.max(2, s.r - s.width * 0.4);
 
+      // Soft outer middle wash
       this.ringMiddleGfx
         .lineStyle(0)
-        .beginFill(s.isDarkCore ? 0x090005 : s.color, norm * (s.isDarkCore ? 0.9 : 0.65))
+        .beginFill(s.isDarkCore ? 0x090005 : s.color, norm * (s.isDarkCore ? 0.85 : 0.55))
         .drawCircle(s.x, s.y, innerR)
         .endFill();
 
-      // Subtle center energy node connecting middle fill to origin
-      if (s.r > 16) {
-        const coreR = Math.min(8, s.r * 0.16);
+      // Concentric inner harmonic ring inside the middle fill for depth
+      if (innerR > 14) {
         this.ringMiddleGfx
-          .beginFill(0xffffff, norm * 0.45)
+          .lineStyle(1.0, s.secondaryColor || 0xffffff, norm * 0.35)
+          .drawCircle(s.x, s.y, innerR * 0.62);
+      }
+
+      // Subtle center core node
+      if (s.r > 16) {
+        const coreR = Math.min(6.5, s.r * 0.14);
+        this.ringMiddleGfx
+          .lineStyle(0)
+          .beginFill(s.secondaryColor || 0xffffff, norm * 0.42)
           .drawCircle(s.x, s.y, coreR)
           .endFill();
       }
     }
 
     // ------------------------------------------------------------
-    // LAYER 1: CONNECTED OUTER RING / OUTLINE (`ringOutlineGfx`)
-    // Computes exact uncovered exterior arcs so overlapping rings fuse
-    // into one seamless outer outline with zero internal cross-lines!
+    // LAYER 1: SMOOTH FEATHERED CONNECTED OUTER OUTLINE (`ringOutlineGfx`)
     // ------------------------------------------------------------
+    const junctions = [];
+
     for (let i = 0; i < rings.length; i++) {
       const s = rings[i];
-      const norm = s.isZone ? 0.92 : Math.pow(Math.max(0, s.life / s.maxL), 0.75);
-      const strokeW = Math.max(1.2, s.width * (s.isZone ? 1.0 : 0.4 + 0.6 * norm));
+      const norm = s.renderNorm;
+      if (norm <= 0.02) continue;
 
-      const exteriorArcs = computeExteriorArcs(s, rings, i, 0);
+      const strokeW = Math.max(1.3, s.width * (s.isZone ? 1.0 : 0.45 + 0.55 * norm));
+      const exteriorArcs = computeSmoothExteriorArcs(s, rings, i, junctions);
+
       for (let a = 0; a < exteriorArcs.length; a++) {
         const [startAng, endAng] = exteriorArcs[a];
         const isFullCircle = endAng - startAng >= FastMath.TWO_PI - 0.02;
 
-        // Outer colored perimeter arc
+        // Pass 1A: Wide soft feathered outer glow halo for anti-aliased smoothness
         if (isFullCircle) {
-          this.ringOutlineGfx.lineStyle(strokeW, s.color, norm).drawCircle(s.x, s.y, s.r);
+          this.ringOutlineGfx
+            .lineStyle(strokeW * 2.5, s.color, norm * 0.22)
+            .drawCircle(s.x, s.y, s.r);
         } else {
           const sx = s.x + Math.cos(startAng) * s.r;
           const sy = s.y + Math.sin(startAng) * s.r;
           this.ringOutlineGfx
-            .lineStyle(strokeW, s.color, norm)
+            .lineStyle(strokeW * 2.5, s.color, norm * 0.22)
             .moveTo(sx, sy)
             .arc(s.x, s.y, s.r, startAng, endAng);
         }
 
-        // Crisp inner white-hot rim highlight on the connected exterior boundary
-        const innerRimR = Math.max(2, s.r - strokeW * 0.65);
+        // Pass 1B: Crisp primary colored outer perimeter arc
+        if (isFullCircle) {
+          this.ringOutlineGfx.lineStyle(strokeW, s.color, norm * 0.92).drawCircle(s.x, s.y, s.r);
+        } else {
+          const sx = s.x + Math.cos(startAng) * s.r;
+          const sy = s.y + Math.sin(startAng) * s.r;
+          this.ringOutlineGfx
+            .lineStyle(strokeW, s.color, norm * 0.92)
+            .moveTo(sx, sy)
+            .arc(s.x, s.y, s.r, startAng, endAng);
+        }
+
+        // Pass 1C: Inner secondary/white core highlight arc
+        const innerRimR = Math.max(2, s.r - strokeW * 0.6);
         if (innerRimR > 4) {
+          const innerCol = s.secondaryColor || 0xffffff;
           if (isFullCircle) {
             this.ringOutlineGfx
-              .lineStyle(Math.max(0.8, strokeW * 0.38), 0xffffff, norm * 0.65)
+              .lineStyle(Math.max(0.9, strokeW * 0.42), innerCol, norm * 0.7)
               .drawCircle(s.x, s.y, innerRimR);
           } else {
             const isx = s.x + Math.cos(startAng) * innerRimR;
             const isy = s.y + Math.sin(startAng) * innerRimR;
             this.ringOutlineGfx
-              .lineStyle(Math.max(0.8, strokeW * 0.38), 0xffffff, norm * 0.65)
+              .lineStyle(Math.max(0.9, strokeW * 0.42), innerCol, norm * 0.7)
               .moveTo(isx, isy)
               .arc(s.x, s.y, innerRimR, startAng, endAng);
           }
         }
       }
+    }
+
+    // Pass 1D: Smooth Metaball Junction Nodes where overlapping rings fuse together
+    for (let j = 0; j < junctions.length; j++) {
+      const pt = junctions[j];
+      this.ringOutlineGfx
+        .lineStyle(0)
+        .beginFill(pt.color, pt.alpha * 0.35)
+        .drawCircle(pt.x, pt.y, 4.2)
+        .beginFill(0xffffff, pt.alpha * 0.75)
+        .drawCircle(pt.x, pt.y, 1.8)
+        .endFill();
     }
   }
 
