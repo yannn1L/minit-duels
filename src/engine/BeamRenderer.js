@@ -234,4 +234,18 @@ export class BeamRenderer {
   update(tS) {
     // Retain graphics state; dynamic frame updates are driven by entities
   }
+
+  destroy() {
+    this.clear();
+    for (const g of this.pool) {
+      if (g && !g.destroyed) {
+        try { g.destroy(); } catch (e) {}
+      }
+    }
+    this.pool = [];
+    if (this.beamContainer && !this.beamContainer.destroyed) {
+      try { this.beamContainer.destroy({ children: true }); } catch (e) {}
+    }
+    this.beamContainer = null;
+  }
 }

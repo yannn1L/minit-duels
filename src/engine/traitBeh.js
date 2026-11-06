@@ -349,7 +349,7 @@ export function registerTraitsAndTargeting() {
         owner.hp += healAmt;
         const oX = owner.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
         const oY = owner.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
-        a.fxPool.spawnDmgText(oX, oY, healAmt, 0x00ff55);
+        a.fxPool.spawnDmgText(oX, oY, healAmt, 0x00ff55, 1.0, { isHeal: true });
       }
 
       if (pay.sound) AudioSys.play(pay.sound);
@@ -495,7 +495,7 @@ export function registerTraitsAndTargeting() {
         owner.hp += tf.stats.hpAdd;
         const oX = owner.x * CFG.GRID.TS + CFG.GRID.HALF_TS;
         const oY = owner.y * CFG.GRID.TS + CFG.GRID.HALF_TS;
-        a.fxPool.spawnDmgText(oX, oY, tf.stats.hpAdd, 0x00ff55);
+        a.fxPool.spawnDmgText(oX, oY, tf.stats.hpAdd, 0x00ff55, 1.0, { isHeal: true });
       }
     }
 

@@ -145,13 +145,45 @@ export class AssetBaker {
     const allKeys = Object.keys(MinitEngine.Registry.textures);
     await this.bakeKeyList(app, allKeys);
 
-    // Digits for damage popup numbers (rendered at 2x resolution for HD crispness)
+    // Dedicated crisp pixel art for plus (+) and minus (-) symbols to guarantee unmistakable clarity
+    const createSignTexture = (isPlus) => {
+      const g = new PIXI.Graphics();
+      // High-contrast black outline
+      g.beginFill(0x000000, 1.0);
+      g.drawRect(2, 5, 10, 4);
+      if (isPlus) {
+        g.drawRect(5, 2, 4, 10);
+      }
+      g.endFill();
+
+      // Crisp white interior that tints cleanly
+      g.beginFill(0xffffff, 1.0);
+      g.drawRect(3, 6, 8, 2);
+      if (isPlus) {
+        g.drawRect(6, 3, 2, 8);
+      }
+      g.endFill();
+
+      const tex = app.renderer.generateTexture(g, {
+        scaleMode: PIXI.SCALE_MODES.NEAREST,
+        resolution: 2
+      });
+      if (tex?.baseTexture) {
+        tex.baseTexture.wrapMode = PIXI.WRAP_MODES.CLAMP;
+        tex.baseTexture.mipmap = PIXI.MIPMAP_MODES.OFF;
+      }
+      g.destroy();
+      return tex;
+    };
+
+    Textures['digit_minus'] = createSignTexture(false);
+    Textures['digit_plus'] = createSignTexture(true);
+
+    // Digits 0-9 and '!' for damage popup numbers (rendered at 2x resolution for HD crispness)
     const digitTasks = [];
     for (let i = 0; i <= 9; i++) {
       digitTasks.push({ key: 'digit_' + i, text: i.toString() });
     }
-    digitTasks.push({ key: 'digit_minus', text: '-' });
-    digitTasks.push({ key: 'digit_plus', text: '+' });
     digitTasks.push({ key: 'digit_bang', text: '!' });
 
     for (let i = 0; i < digitTasks.length; i++) {

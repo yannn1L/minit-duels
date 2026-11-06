@@ -1237,7 +1237,8 @@ export class Arena extends PIXI.Container {
       rp.life -= tS;
       rp.r += (rp.maxR - rp.r) * 0.22 * tS;
       if (rp.life <= 0) {
-        this.gridRipples.splice(i, 1);
+        this.gridRipples[i] = this.gridRipples[this.gridRipples.length - 1];
+        this.gridRipples.pop();
       }
     }
 
@@ -1246,7 +1247,8 @@ export class Arena extends PIXI.Container {
       const wr = this.wallRipples[i];
       wr.life -= tS;
       if (wr.life <= 0) {
-        this.wallRipples.splice(i, 1);
+        this.wallRipples[i] = this.wallRipples[this.wallRipples.length - 1];
+        this.wallRipples.pop();
       }
     }
 
@@ -1265,42 +1267,49 @@ export class Arena extends PIXI.Container {
       return;
     }
 
-    // Displaced reactive grid vertices
+    // Displaced reactive grid vertices (Zero-heap allocation with reusable point)
     const segStep = 8;
-    const displacePt = (bx, by) => {
+    const pt = this._reusableGridPt || (this._reusableGridPt = { x: 0, y: 0 });
+    const numRipples = this.gridRipples.length;
+    const displaceInto = (bx, by) => {
       let ox = bx;
       let oy = by;
-      for (let r = 0; r < this.gridRipples.length; r++) {
+      for (let r = 0; r < numRipples; r++) {
         const rp = this.gridRipples[r];
         const dx = bx - rp.x;
         const dy = by - rp.y;
-        const d = Math.sqrt(dx * dx + dy * dy);
-        const band = Math.abs(d - rp.r);
-        if (band < 24 && d > 0.1) {
-          const env = (1 - band / 24) * (rp.life / rp.maxLife) * rp.strength;
-          ox += (dx / d) * env;
-          oy += (dy / d) * env;
+        const dSq = dx * dx + dy * dy;
+        if (dSq > 0.01) {
+          const d = Math.sqrt(dSq);
+          const band = Math.abs(d - rp.r);
+          if (band < 24) {
+            const env = (1 - band / 24) * (rp.life / rp.maxLife) * rp.strength;
+            ox += (dx / d) * env;
+            oy += (dy / d) * env;
+          }
         }
       }
-      return { x: ox, y: oy };
+      pt.x = ox;
+      pt.y = oy;
+      return pt;
     };
 
     this.gridGfx.lineStyle(1, CFG.ARENA.GRID_COLOR, CFG.ARENA.GRID_ALPHA);
     for (let x = 1; x < CFG.GRID.COLS; x++) {
       const baseX = x * TS;
-      const p0 = displacePt(baseX, 0);
-      this.gridGfx.moveTo(p0.x, p0.y);
+      displaceInto(baseX, 0);
+      this.gridGfx.moveTo(pt.x, pt.y);
       for (let py = segStep; py <= AH; py += segStep) {
-        const pt = displacePt(baseX, py);
+        displaceInto(baseX, py);
         this.gridGfx.lineTo(pt.x, pt.y);
       }
     }
     for (let y = 1; y < CFG.GRID.ROWS; y++) {
       const baseY = y * TS;
-      const p0 = displacePt(0, baseY);
-      this.gridGfx.moveTo(p0.x, p0.y);
+      displaceInto(0, baseY);
+      this.gridGfx.moveTo(pt.x, pt.y);
       for (let px = segStep; px <= AW; px += segStep) {
-        const pt = displacePt(px, baseY);
+        displaceInto(px, baseY);
         this.gridGfx.lineTo(pt.x, pt.y);
       }
     }
@@ -1491,7 +1500,12 @@ export class Arena extends PIXI.Container {
   destroy(options) {
     if (this.beamRenderer) {
       try {
-        this.beamRenderer.clear();
+        this.beamRenderer.destroy();
+      } catch (e) {}
+    }
+    if (this.fxPool) {
+      try {
+        this.fxPool.destroy();
       } catch (e) {}
     }
     if (this.summons) {

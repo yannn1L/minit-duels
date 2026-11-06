@@ -32,6 +32,7 @@ Designed from the ground up to be **100% data-driven and moddable**, Minit Duels
   - **Automatic Filename Asset Sync**: Drop `ninja.js` and `ninja.png` (together or in separate steps) and the engine automatically pairs them by filename stem, converts textures into crisp `NEAREST` GPU textures, and persists them in `localStorage`.
   - **Headless Balance Matrix**: Simulate hundreds or thousands of 1v1 duels in milliseconds without rendering overhead to inspect **Overall Winrates**, **Matchup Heatmaps (A vs B)**, **Average Time-To-Kill (TTK)**, **DPS**, and **Automated Balance Tiers** (`OVERPOWERED`, `BALANCED`, `UNDERPOWERED`).
   - **Real-Time Debug & Telemetry Mode**: Toggle hitboxes, attack zone radii, velocity/aim vectors, live entity state tags, combat logs, and simulation time-scaling (`0.25x` slow-mo to `4x` turbo).
+  - **Live Audio, VFX & Arena Settings Tab (`⚙ SETTINGS`)**: Smoothly tweak master SFX volume, procedural hit-stop & screen shake, particle density & quality multipliers, reactive floor grid ripple physics, and multi-layer connected visual effects (individual opacity sliders for outer perimeter outlines, translucent middle fills, and scorch craters).
 - **Dual-Orientation Responsive Layout**:
   - **Landscape (Desktop)**: Centered combat arena framed symmetrically by Player 1 and Player 2 fighter HUD cards.
   - **Portrait (Mobile)**: Arena positioned at the top with side-by-side fighter HUD cards docked underneath.
@@ -79,8 +80,6 @@ Designed from the ground up to be **100% data-driven and moddable**, Minit Duels
 │   │   ├── SceneManager.js         # Viewport scaling, orientation listener & scene lifecycle
 │   │   ├── VFXPool.js              # Object pool for particles, shockwaves & damage popups
 │   │   └── traitBeh.js             # Built-in universal combat & movement traits
-│   ├── filters/
-│   │   └── CRTFilter.js            # Optional retro scanline & CRT post-processing shader
 │   ├── minits/
 │   │   ├── index.js                # Built-in Minit roster registration
 │   │   ├── absorb.js               # Gravity vortex leech & stat-scaling Minit
@@ -90,13 +89,14 @@ Designed from the ground up to be **100% data-driven and moddable**, Minit Duels
 │   │   ├── murasaki.js             # Limitless Blue/Red attraction & Hollow Purple Minit
 │   │   ├── pulsar.js               # 360° spiral bullet-hell turret Minit
 │   │   ├── saitama.js              # 3-Tier Punch Minit (Normal, Consecutive, 9999 Serious)
+│   │   ├── schrodinger.js          # Quantum superposition, probability clouds & wave collapse Minit
 │   │   └── waves.js                # Harmonic shockwave lob & paralysis Minit
 │   ├── scenes/
 │   │   ├── LoadingScene.js         # Boot loader, CustomMinitManager hydration & texture baking
 │   │   ├── EditorScene.js          # Fighter selection screen & Workshop launcher
 │   │   └── SimulationScene.js      # Real-time 1v1 combat arena & dual-orientation HUD
 │   └── ui/
-│       └── WorkshopModal.js        # Retro pixel modal for Minit Manager, Balance & Debug
+│       └── WorkshopModal.js        # Retro pixel modal for Minit Manager, Balance, Debug & Settings
 ├── index.html
 ├── package.json
 └── vite.config.ts
@@ -113,7 +113,7 @@ Unlike traditional engines that load hundreds of tiny particle PNGs over the net
 3. **GPU Texture Baking (`AssetBaker.bake`)**:
    - Base character sprites (`textures.base`) are loaded from file paths or base64 DataURLs with `PIXI.SCALE_MODES.NEAREST` so pixel art stays razor-sharp.
    - Procedural textures (`customTextures`) are drawn onto an offscreen `PIXI.Graphics` canvas and converted into hardware GPU textures via `app.renderer.generateTexture()`.
-   - Bitmap digits (`0–9` and `-`) are pre-rendered once into textures for zero-overhead floating damage numbers.
+   - Dedicated pixel-perfect sign glyphs (`+` for healing and `-` for damage) and digits (`0–9`, `!`) are baked once into GPU textures for zero-overhead floating combat feedback.
 
 ### 2. The Coordinate System: Grid Units vs. Pixel Coordinates
 To keep combat math clean and resolution-independent, the engine separates **Logical Grid Units** from **Screen Pixels**:
@@ -390,7 +390,7 @@ Inside any `onExecute` or `hooks` function, you can call these high-level method
 - **`arena.spawnBarrier(self, cfg)`**: Spawns a protective shield field (`radius`, `hp`, `life`, `followOwner`, `orbitRadius`, `blocksProjectiles`, `reflectProjectiles`, `pushEnemies`, `contactDmg`).
 - **`arena.teleport(self, x, y, options)`**: Blinks `self` to `(x, y)` with departure/arrival shockwaves.
 - **`arena.dash(self, targetOrAngle, speed, durationTicks, options)`**: High-speed directional burst dash.
-- **`arena.heal(self, amount)`** & **`arena.addShield(self, amount, maxShield)`**: Restores HP or grants a glowing absorption shield.
+- **`arena.heal(self, amount, options)`** & **`arena.addShield(self, amount, maxShield)`**: Restores HP (triggering floating green `+` heal popups and ascending sparkle particles) or grants a glowing absorption shield.
 - **`arena.applyStatus(self, target, { stunTicks, slowTicks, slowMult, invulnTicks, dmg, duration })`**: Inflicts crowd control or DoTs.
 - **`arena.setPhase(self, phasePatch)`**: Dynamically transforms stats, sprite texture, color, movement AI, or actions mid-battle.
 
@@ -638,8 +638,12 @@ a.fxPool.spawnShockwave(
   4             // Ring thickness
 );
 
-// 3. Spawn floating bitmap number (e.g. green heal text)
-a.fxPool.spawnDmgText(pX, pY, 50, 0x00ff55, 1.0);
+// 3. Spawn floating combat popups:
+// Damage popup (displays -DMG in weapon color or gold critical)
+a.fxPool.spawnDmgText(pX, pY, 45, 0xff0000, 1.0, { isCrit: true });
+
+// Healing popup (displays +HEAL in vibrant green)
+a.fxPool.spawnDmgText(pX, pY, 60, 0x00ff66, 1.0, { isHeal: true });
 ```
 
 > **Pro Tip — Rendering a Moving Projectile Sprite**: Because `VFXPool` is pre-allocated and super fast, projectiles in Minit Duels render their body each tick by calling `a.fxPool.spawnPhysics('fx_my_proj', pX, pY, 0, 0, 2, 1, 1, false, 0xffffff)` inside their trait!

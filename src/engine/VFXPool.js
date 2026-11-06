@@ -818,10 +818,27 @@ export class VFXPool {
   spawnDmgText(x, y, dmg, color = 0xff0000, scale = 1.0, options = null) {
     if (DebugConfig.state.vfxShowDmgText === false) return;
     if (this.pool.txts.length === 0) return;
-    const val = Math.max(1, Math.floor(dmg));
+    const val = Math.max(1, Math.floor(Math.abs(dmg)));
     const str = val.toString();
 
-    const isHeal = Boolean(options?.isHeal || color === 0x00ff55 || color === 0x00ff66);
+    const isHeal = Boolean(
+      options === true ||
+      options?.isHeal ||
+      options?.heal ||
+      options?.type === 'heal' ||
+      dmg < 0 ||
+      color === 0x00ff55 ||
+      color === 0x00ff66 ||
+      color === 0x00ff00 ||
+      color === 0x33ff33 ||
+      color === 0x22c55e ||
+      color === 0x10b981 ||
+      color === 0x00e676 ||
+      color === 0x00ff88 ||
+      color === 0x00ffaa ||
+      color === 0x44ff44 ||
+      (((color >> 8) & 0xff) >= 190 && ((color >> 16) & 0xff) < 130 && (color & 0xff) < 170)
+    );
     const isCrit =
       options?.isCrit !== undefined
         ? Boolean(options.isCrit)
@@ -834,7 +851,9 @@ export class VFXPool {
     t.isCrit = isCrit;
 
     const signTex = this.textures[isHeal ? 'digit_plus' : 'digit_minus'];
-    const mainTint = isCrit && color === 0xff0000 ? 0xffdd00 : color;
+    const mainTint = isHeal
+      ? (color === 0xff0000 ? 0x00ff66 : color)
+      : (isCrit && color === 0xff0000 ? 0xffdd00 : color);
 
     let glyphIdx = 0;
     if (signTex) {
@@ -1245,5 +1264,33 @@ export class VFXPool {
       const baseScale = t.customScale || 1.0;
       t.scale.set(elasticBounce * baseScale);
     }
+  }
+
+  destroy() {
+    if (this.scorchGfx && !this.scorchGfx.destroyed) {
+      try { this.scorchGfx.destroy(); } catch (e) {}
+    }
+    if (this.ringMiddleGfx && !this.ringMiddleGfx.destroyed) {
+      try { this.ringMiddleGfx.destroy(); } catch (e) {}
+    }
+    if (this.ringOutlineGfx && !this.ringOutlineGfx.destroyed) {
+      try { this.ringOutlineGfx.destroy(); } catch (e) {}
+    }
+
+    const layers = [
+      this.decalLayer,
+      this.shockwaveLayer,
+      this.underParticleLayer,
+      this.overParticleLayer,
+      this.textLayer
+    ];
+    for (const layer of layers) {
+      if (layer && !layer.destroyed) {
+        try { layer.destroy({ children: true }); } catch (e) {}
+      }
+    }
+
+    this.pool = { phys: [], sws: [], swSprites: [], txts: [], decals: [], scorches: [] };
+    this.act = { phys: [], sws: [], swSprites: [], txts: [], decals: [], scorches: [] };
   }
 }
