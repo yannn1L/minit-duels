@@ -1,110 +1,94 @@
-# High-Performance Combat Juice & Particle Graphics Upgrade
+# Multi-Layer Connected VFX & Anti-Clutter Rendering System
 
-Deliver a visceral, arcade-grade visual and particle overhaul for Minit Duels—combining directional hit sparks, additive bloom glows, dash/projectile afterimages, multi-ring shockwaves, persistent floor scorch marks, reactive arena grid ripples, and bouncy damage popups—all running inside a zero-allocation object pool with an auto-adaptive FPS budget and a user-selectable VFX Quality toggle.
+This update refactors the arena visual effects pipeline into a **multi-layered connected FX system** that separates every shockwave, area zone, and floor scorch into distinct **Outer Ring/Outline**, **Middle Core Fill**, and **Top Particle** layers. Overlapping rings and zones seamlessly fuse into unified connected shapes underneath the fighters—eliminating intersecting ring clutter and ensuring Minits remain 100% visible even during heavy ability spam.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> All core visual, particle, and performance preferences have been confirmed in Phase 1:
+> The following architectural choices incorporate your confirmed preferences from the clarification step:
 
-- **Confirmed Decision 1 — Particle & Surface Effects**: Implement directional hit sparks, glowing embers, and flash bursts; motion trails and ghost afterimages for dashes, teleports, and fast projectiles; multi-ring shockwaves and persistent fading floor scorch marks; plus ambient status aura particles for shields, poison, stun, and slow states.
-- **Confirmed Decision 2 — Combat Juice & Arena Presentation**: Add dynamic hit-stop scaling, directional knockback, and velocity-aligned squash-and-stretch; additive (`BLEND_MODES.ADD`) bloom glow layers on projectiles, beams, and fighters; critical/heavy-hit damage popups with color coding and elastic bounce physics; and a reactive arena grid with wall impact ripples on collisions.
-- **Confirmed Decision 3 — Performance & Quality Controls**: Use an auto-adaptive particle budget that dynamically scales emission density if frame rate dips below 52 FPS, paired with an explicit VFX Quality selector (`AUTO` / `HIGH` / `LOW`) accessible in the HUD and Dev panel.
+- **Confirmed Decision 1 — Unified Connected Outlines & Middle Fills**: Overlapping shockwaves, vortexes, and scorch zones render through a two-pass connected silhouette technique (Outer Perimeter Pass + Interior Fill Masking Pass) so intersecting rings merge into one continuous outline without messy criss-crossing inner lines.
+- **Confirmed Decision 2 — Fighter-First Depth Ordering**: All scorch marks, ring outlines, and middle fills render **underneath** the Minit fighters and summons, while only crisp directional sparks, projectiles, and damage popups render **above** the fighters.
+- **Confirmed Decision 3 — Per-Layer Opacity Sliders & Crowd Auto-Fade**: The Dev Workshop **SETTING** tab gains dedicated opacity sliders for **Ring Outlines**, **Middle Fills**, **Floor Scorches**, and **Particles**, plus an **Auto-Fade Crowd Damping** system that dynamically softens opacity and accelerates decay when many FX overlap.
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Transforms every collision, projectile volley, laser beam, dash, and knockout into a tactile, high-contrast spectacle while maintaining 60 FPS determinism and 100% compatibility with headless balance simulations.
-- **Target Audience / Persona**: Players and Minit creators who want fights to feel punchy, readable, and satisfying on both desktop and mobile viewports without frame drops during bullet-hell or summon-heavy matchups.
-- **Key Value**:
-  - **Visceral Impact Feedback**: Every hit communicates direction, force, and damage tier through directional spark cones, hit-stop micro-freezes, additive glow bursts, and elastic damage numbers.
-  - **Living Arena Floor**: Explosions leave fading scorch marks on the floor layer, and wall bounces or shockwaves send localized energy ripples across the arena grid and perimeter guards.
-  - **Guaranteed 60 FPS**: Pre-allocated sprite pools with O(1) swap-and-pop recycling and an automatic frame-time governor ensure zero garbage-collection pauses even when hundreds of particles are active.
+- **What It Does**: Replaces the single-sprite additive shockwave/decal stack with a coordinated 4-layer floor & particle compositor. When multiple shockwaves, zones (such as Absorb's vortex or Waves' sonic pulses), or scorch craters overlap, their outer borders connect into a single cohesive perimeter while their middle fills blend at a capped alpha underneath the fighters.
+- **Target Audience / Persona**: Players and Minit creators testing fast-paced or multi-summon matchups where rapid ability triggers previously stacked bright opaque circles over the arena.
+- **Key Value**: Preserves combat readability at all times while making area effects look deliberate, cohesive, and visually connected.
 
 ---
 
 ## 2. User Experience & Visual Design
 
-- **Key User Flows**:
-  1. **Entering a Duel**: The arena initializes with a subtle ambient neon grid, soft fighter under-glows, and a compact `VFX: AUTO` (or `HIGH` / `LOW`) toggle pill in the top corner.
-  2. **Movement, Dashes & Projectiles**: Fast-moving fighters, dashes, and high-velocity projectiles leave fading additive ghost afterimages and ember ribbons.
-  3. **Impacts & Wall Collisions**:
-     - Projectiles and melee strikes emit a directional cone of high-velocity sparks (`fx_spark` stretched along velocity vector), a soft additive glow flare (`fx_glow`), and floating embers.
-     - Wall bounces trigger a localized neon ripple along the arena border wall and deform the nearby grid lines outward before springing back.
-  4. **Heavy Hits, Crits & Knockouts**:
-     - High-damage hits (>25 DMG or >12% max HP) trigger a scaled hit-stop freeze (2–5 ticks), an emphasized gold/crimson popup with an exclamation mark (`!`) and bounce physics, and a double concentric shockwave ring.
-     - Explosions and KOs stamp a persistent dark-charred neon scorch decal onto the floor layer that slowly cools and fades over several seconds.
-  5. **Status & Shield Auras**: Shielded units emit rising cyan hex/sparkle motes, poisoned units bubble with toxic green droplets, slowed units shed frost shards, and stunned units display orbiting star sparks.
-  6. **HUD Card Reactive Feedback**: Player HUD cards on the sides/bottom of the screen subtly shake when their fighter takes heavy damage and feature a smooth white "damage trail" bar behind the segmented HP bar so players can visually gauge chunk damage.
-
-- **Visual Identity & Theme**:
-  - *Aesthetic Direction*: Crisp HD Retro-Arcade Neon (`Press Start 2P` pixel typography paired with multi-layered additive WebGL light and particle physics).
-  - *Color Palette & Mood*:
-    - **60% Dominant Arena Canvas**: Deep Obsidian Void (`#07070C`) and Arena Slate (`#12121E`) so additive particles pop with maximum contrast.
-    - **30% Structural Surfaces**: Crisp grid lines (`#1C1C2E`), titanium corner guards (`#2A2A40`), and dark slate fighter HUD cards (`#0D0D16`).
-    - **10% High-Intent Accents & Additive FX**: Pure White (`#FFFFFF`) super-heated cores, Cyber Cyan (`#00E5FF`) shields/ripples, Solar Gold (`#FFDD00`) heavy/critical hits, Toxic Emerald (`#00FF66`) poison, and Crimson Alert (`#FF0055`) damage flashes.
-  - *Typography & Hierarchy*: High-DPI (`resolution: 2`) pixel-art numerals (`0–9`, `-`, `+`, `!`) pre-baked into GPU textures for zero-overhead damage, heal, and critical hit popups.
+- **Connected 3-Part FX Anatomy**:
+  1. **Layer 1 — Outer Ring / Perimeter Outline (Under Fighters)**: Crisp colored outer boundary around shockwaves, zones, and scorch craters. When two or more circles overlap, only the exterior perimeter remains visible.
+  2. **Layer 2 — Middle Core Fill (Under Fighters)**: Soft translucent interior fill that bridges overlapping circles and masks out internal intersecting border lines so connected rings share a single unified interior.
+  3. **Layer 3 — Crisp Accent Particles (Over Fighters)**: High-velocity directional hit sparks, embers, and status motes that ride along the ring perimeter or burst on impact without obscuring unit silhouettes.
+- **Crowd Auto-Fade & Spatial Merging**:
+  - Nearby scorch marks spawned within a short distance automatically merge into an existing crater rather than stacking duplicate decals.
+  - When active rings or decals exceed the comfort threshold, crowd damping smoothly lowers floor FX alpha and accelerates fade-out on the oldest rings.
+- **Live Controls in Dev Workshop (`SETTING` Tab)**:
+  - **Ring / Outline Opacity** (`0%–100%`)
+  - **Middle Fill Opacity** (`0%–100%`)
+  - **Floor Scorch Opacity** (`0%–100%`)
+  - **Particle Layer Opacity** (`0%–100%`)
+  - **Crowd Auto-Fade Toggle** (automatically dampens overlapping FX spam)
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Pre-Baked Procedural FX Textures + Additive Blend Layer (`BLEND_MODES.ADD`)**
-  - *Chosen Approach*: Bake specialized procedural textures (`fx_spark`, `fx_glow`, `fx_ember`, `fx_scorch`, `fx_ring_thin`, `fx_star`, `digit_plus`, `digit_bang`) at startup in `AssetBaker` and render light-emitting particles in a dedicated additive container (`PIXI.BLEND_MODES.ADD`), while rendering floor scorch decals and ghost trails in an under-unit decal layer.
-  - *Why*: WebGL `Filter` shaders (like `BloomFilter` or `BlurFilter`) require full-screen render-target passes every frame that hurt mobile fill-rate. Pre-baked radial glow textures combined with `BLEND_MODES.ADD` achieve authentic neon bloom in a single batched draw call at 0ms extra GPU shader cost.
-  - *Alternatives Considered*: Full-scene `PIXI.BlurFilter` post-processing, which degrades performance on mobile GPUs and blurs crisp pixel art.
-
-- **Decision 2: Auto-Adaptive Particle Governor with Manual Override (`AUTO` / `HIGH` / `LOW`)**
-  - *Chosen Approach*: Track a rolling 30-frame FPS average inside the VFX manager. In `AUTO` mode, particle emission multiplier smoothly scales between `1.0x` (at 58+ FPS) and `0.35x` (if FPS drops below 50), prioritizing critical gameplay cues (damage numbers, shockwaves, beams) over decorative ambient dust. Users can also click the compact `VFX: AUTO/HIGH/LOW` button to lock their preference.
-  - *Why*: Guarantees smooth 60 FPS gameplay across all devices while letting desktop players enjoy maximum particle density.
-
-- **Decision 3: Reactive Grid & Wall Ripple Geometry via Sparse Displacement**
-  - *Chosen Approach*: Subdivide arena grid lines into lightweight vertex segments that displace radially away from shockwaves, explosions, and wall bounces using fast spring-damper math, redrawing only when active ripples exist (`activeRipples.length > 0`).
-  - *Why*: Delivers a Geometry-Wars-style reactive arena floor that makes impacts feel grounded in the environment, with zero CPU cost when the grid is at rest.
+- **Decision 1: Two-Pass Connected Vector/Sprite Compositing vs. Full-Screen Fragment Shader**
+  - *Chosen Approach*: Render active rings, zones, and scorches using a batched two-pass floor compositor (Pass 1 stamps outer perimeter discs/strokes; Pass 2 stamps slightly inset interior cores that overwrite internal overlap seams, rendered at capped container alpha).
+  - *Why*: Achieves clean boolean-union connected outlines for any number of overlapping rings at 60 FPS with zero WebGL framebuffer reallocation overhead and full compatibility with PixiJS masking.
+  - *Alternatives Considered*: Full-screen distance-field metaball fragment shader (adds per-pixel fullscreen shader pass cost and blurs sharp pixel-art edges).
+- **Decision 2: Routing Zone & Ring Visuals Under Units**
+  - *Chosen Approach*: Move shockwaves (`spawnShockwave`) and persistent zone rings/cores (such as Absorb's singularity ring and Waves' charge aura) into the under-unit layered compositor, while keeping projectiles and hit sparks in the over-unit particle layer.
+  - *Why*: Ensures Minit sprites, shields, and HP bars are never washed out by additive ring blooms.
 
 ---
 
 ## 4. Technical Architecture & Data Strategy *(Technical Reference)*
 
-### Architecture & Rendering Layer Diagram
+### Architecture & Layer Hierarchy Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                       SimulationScene & HUD Layer                       │
-│  ┌──────────────────────┐  ┌──────────────────────┐  ┌───────────────┐  │
-│  │ P1 & P2 Fighter Cards│  │ Arena Viewport (aG)  │  │ VFX Quality   │  │
-│  │ • Segmented HP Bar   │  │ • Hit-Stop Controller│  │ Toggle Button │  │
-│  │ • White Damage Trail │  │ • Directional Shake  │  │ (AUTO/HI/LOW) │  │
-│  │ • Card Hit Jolt      │  └──────────┬───────────┘  └───────┬───────┘  │
-└──┴──────────────────────┴─────────────┼──────────────────────┼──────────┘
-                                        ▼                      ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     Arena Multi-Pass Render Hierarchy                   │
+│                         ARENA SCENE CONTAINER                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [0] Reactive Grid & Wall Ripples (gridGfx)                             │
 │                                                                         │
-│  1. Floor & Reactive Grid Layer (`gridGfx`)                             │
-│     └── Dynamic spring-displaced grid vertices + Wall impact ripples    │
-│  2. Under-Unit Decal & Trail Layer (`fxU`)                              │
-│     └── Fading floor scorch marks (`fx_scorch`) + Ghost afterimages     │
-│  3. Main Actor & Entity Layer (`layer` / `summonLayer`)                 │
-│     └── Fighters, Summons, Projectiles (with velocity squash/stretch)   │
-│  4. Unit Overlay Layer (`unitOverlayGfx`)                               │
-│     └── Hexagonal/pulsing shields, barriers, stun stars, mini HP bars   │
-│  5. Additive Bloom & Beam Layer (`fxAdd` / `beamRenderer`)              │
-│     └── `BLEND_MODES.ADD` directional sparks, glow halos, laser arcs    │
-│  6. Combat Text Popup Layer (`fxO`)                                     │
-│     └── Bouncy damage numbers, heavy/crit `!` badges, green `+` heals   │
+│  [1] Under-Fighter Connected FX Container (fxU)                         │
+│      ├─► Scorch Connected Layer (Outer Char Rim + Merged Inner Crater)  │
+│      ├─► Ring Outline Layer     (Pass 1: Unified Outer Perimeter Rim)   │
+│      ├─► Ring Middle Fill Layer (Pass 2: Seam-Masking Core & Inner Glow)│
+│      └─► Under-Unit Trails      (Motion Afterimages & Ground Wisps)     │
+│                                                                         │
+│  [2] Fighter & Summon Layer                                             │
+│      ├─► Unit Under-Glows (unitGlowLayer)                               │
+│      ├─► Summons, Clones & Turrets (summonLayer)                        │
+│      ├─► Primary Minit Fighters (players[].spr)                         │
+│      └─► Unit Shields, Barriers & Mini HP Bars (unitOverlayGfx)         │
+│                                                                         │
+│  [3] Over-Fighter Accent FX Container (fxO)                             │
+│      ├─► Crisp Particle Layer   (Pass 3: Sparks, Embers & Projectiles)  │
+│      ├─► Vector Beams           (beamRenderer)                          │
+│      └─► Floating Damage Popups (textLayer)                             │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Model & Pool Architecture
+### Interactive Component & State Mapping
 
-- **Pre-Allocated VFX Pools (O(1) Swap-and-Pop)**:
-  - **Physics & Spark Pool (`phys`)**: Expanded to 600 pre-allocated sprites supporting velocity-aligned rotation (`alignToVel`), anisotropic stretching (long spark streaks that shorten as they slow down), gravity/buoyancy (`grav`), angular spin (`vRot`), additive blending (`BLEND_MODES.ADD`), and color tinting.
-  - **Afterimage & Scorch Decal Pool (`decals`)**: 120 pre-allocated sprites on the under-unit layer for fighter dash ghosts, projectile motion ribbons, and persistent explosion scorch marks.
-  - **Multi-Ring Shockwave Pool (`sws`)**: 32 pre-allocated ring sprites supporting dual-ring staggered bursts (fast thin outer ring + slower bright inner ring).
-  - **Elastic Damage & Heal Text Pool (`txts`)**: 45 pre-allocated multi-glyph containers supporting `-`, `+`, `0–9`, and `!` glyphs with arc-bounce physics and critical-hit scale pops.
-- **Reactive Arena Grid State (`gridRipples`)**:
-  - Ring-buffer of up to 12 active ripple impulses `{ x, y, radius, maxRadius, strength, color, life, maxLife }` triggered automatically on `spawnShockwave`, `onWallBounce`, and knockouts.
-- **Headless Determinism Guarantee**:
-  - `HEADLESS_FX_POOL` exposes no-op stubs for all new VFX methods (`spawnSparkBurst`, `spawnAfterimage`, `spawnScorch`, `spawnGlow`, `spawnGridRipple`, `spawnHealText`) so headless 1,000-match balance simulations run at maximum speed with zero visual overhead.
+- **Persisted Layer Settings (`DebugConfig`)**:
+  - Adds `vfxOutlineAlpha` (`0.75`), `vfxMiddleAlpha` (`0.28`), `vfxScorchAlpha` (`0.45`), `vfxParticleAlpha` (`0.95`), and `vfxCrowdAutoFade` (`true`) to `DEFAULT_DEBUG_STATE` with instant synchronization to `CFG.VFX` and `VFXPool`.
+- **Connected Ring & Scorch Compositor (`VFXPool`)**:
+  - Separates shockwaves, persistent zone rings (`spawnZoneRing`), and scorch marks into 3 coordinated visual parts:
+    1. **Outline Rim**: Drawn in the outline pass at full radius `R`.
+    2. **Middle Core**: Drawn in the middle pass at `R - rimWidth` to seamlessly erase internal intersecting arcs between overlapping rings of the same or adjacent effects, topped with a subtle center pulse.
+    3. **Rim Accent Particles**: Spawns lightweight tangential/radial sparks on the particle layer so the ring outline feels alive and connected to the particle system.
+  - Implements **Crowd Auto-Fade**: Computes a live crowd factor from active rings and scorches, scaling container alphas and accelerating decay on older entries when multiple effects stack.
+- **Dev Workshop `SETTING` Tab**:
+  - Binds real-time sliders for `vfxOutlineAlpha`, `vfxMiddleAlpha`, `vfxScorchAlpha`, `vfxParticleAlpha`, and a checkbox for `vfxCrowdAutoFade`, with full support in `RESET DEFAULTS`.

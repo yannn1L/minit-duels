@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for the High-Performance Combat Juice & Particle Graphics Engine upgrade, covering directional hit sparks, motion trails/afterimages, multi-ring shockwaves, floor scorch decals, status auras, additive bloom glow, reactive arena grid/wall ripples, critical damage popups, and an auto-adaptive particle budget with a VFX quality toggle.",
-  "updatedAt": "2026-11-04T04:52:21.519720197Z",
+  "summary": "Implementation plan for a 3+ layer connected VFX architecture (Outer Outline Ring Layer, Middle Core Fill Layer, Floor Scorch Layer, and Top Particle Layer) that merges overlapping rings/zones into unified connected shapes underneath fighters and adds per-layer opacity and anti-clutter controls in the Settings tab.",
+  "updatedAt": "2026-11-06T06:51:27.141589699Z",
   "requestFeedback": true,
   "userFacing": true
 }

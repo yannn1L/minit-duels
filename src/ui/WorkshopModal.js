@@ -881,6 +881,30 @@ export class WorkshopModal {
         </div>
 
         <div class="mw-slider-row">
+          <span>Ring Outline Opacity</span>
+          <input type="range" class="mw-range" min="0" max="1.0" step="0.05" value="${dbg.vfxOutlineAlpha ?? 0.75}" data-range-key="vfxOutlineAlpha" data-unit="pct" />
+          <span class="mw-val-badge" id="val-vfxOutlineAlpha">${Math.round((dbg.vfxOutlineAlpha ?? 0.75) * 100)}%</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Middle Fill Opacity</span>
+          <input type="range" class="mw-range" min="0" max="1.0" step="0.02" value="${dbg.vfxMiddleAlpha ?? 0.26}" data-range-key="vfxMiddleAlpha" data-unit="pct" />
+          <span class="mw-val-badge" id="val-vfxMiddleAlpha">${Math.round((dbg.vfxMiddleAlpha ?? 0.26) * 100)}%</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Floor Scorch Opacity</span>
+          <input type="range" class="mw-range" min="0" max="1.0" step="0.05" value="${dbg.vfxScorchAlpha ?? 0.45}" data-range-key="vfxScorchAlpha" data-unit="pct" />
+          <span class="mw-val-badge" id="val-vfxScorchAlpha">${Math.round((dbg.vfxScorchAlpha ?? 0.45) * 100)}%</span>
+        </div>
+
+        <div class="mw-slider-row">
+          <span>Top Particle Opacity</span>
+          <input type="range" class="mw-range" min="0.1" max="1.0" step="0.05" value="${dbg.vfxParticleAlpha ?? 0.95}" data-range-key="vfxParticleAlpha" data-unit="pct" />
+          <span class="mw-val-badge" id="val-vfxParticleAlpha">${Math.round((dbg.vfxParticleAlpha ?? 0.95) * 100)}%</span>
+        </div>
+
+        <div class="mw-slider-row">
           <span>Camera Shake Intensity</span>
           <input type="range" class="mw-range" min="0" max="2.5" step="0.05" value="${dbg.vfxShakeScale ?? 1.0}" data-range-key="vfxShakeScale" data-unit="mult" />
           <span class="mw-val-badge" id="val-vfxShakeScale">${Number(dbg.vfxShakeScale ?? 1.0).toFixed(2)}x</span>
@@ -911,6 +935,10 @@ export class WorkshopModal {
         </div>
 
         <div class="mw-subgrid-2">
+          <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
+            <span>Auto-Fade Heavy FX</span>
+            <input type="checkbox" class="mw-checkbox" data-chk-key="vfxCrowdAutoFade" ${dbg.vfxCrowdAutoFade !== false ? 'checked' : ''} />
+          </label>
           <label class="mw-row-between" style="font-size:11px;cursor:pointer;">
             <span>Grid & Wall Ripples</span>
             <input type="checkbox" class="mw-checkbox" data-chk-key="vfxShowGridRipples" ${dbg.vfxShowGridRipples !== false ? 'checked' : ''} />

@@ -22,12 +22,13 @@ const HEADLESS_FX_POOL = {
   spawnGlow: NOOP_FN,
   spawnAfterimage: NOOP_FN,
   spawnScorch: NOOP_FN,
+  spawnZoneRing: NOOP_FN,
   spawnShockwave: NOOP_FN,
   spawnDmgText: NOOP_FN,
   getBudgetMult: () => 1.0,
   update: NOOP_FN,
-  act: { phys: [], sws: [], txts: [], decals: [] },
-  pool: { phys: [], sws: [], txts: [], decals: [] }
+  act: { phys: [], sws: [], txts: [], decals: [], scorches: [] },
+  pool: { phys: [], sws: [], txts: [], decals: [], scorches: [] }
 };
 const HEADLESS_BEAM_RENDERER = {
   renderBeam: NOOP_FN,

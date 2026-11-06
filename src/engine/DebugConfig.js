@@ -26,6 +26,11 @@ export const DEFAULT_DEBUG_STATE = {
   // Setting Tab — VFX & Combat Juice
   vfxQuality: 'auto', // 'auto' | 'high' | 'low'
   vfxParticleMult: 1.0,
+  vfxOutlineAlpha: 0.75,
+  vfxMiddleAlpha: 0.26,
+  vfxScorchAlpha: 0.45,
+  vfxParticleAlpha: 0.95,
+  vfxCrowdAutoFade: true,
   vfxShakeScale: 1.0,
   vfxHitStopScale: 1.0,
   vfxFlashScale: 1.0,
